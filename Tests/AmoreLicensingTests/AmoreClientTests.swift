@@ -1,0 +1,224 @@
+import Foundation
+import JWTKit
+import Testing
+
+@testable import AmoreLicensing
+
+@MainActor
+@Suite struct AmoreClientTests {
+    private let hardwareId = "TEST-SERIAL-123"
+    private let bundleId = "com.test.amorekit"
+
+    private func makeKeys() throws -> (EdDSA.PrivateKey, EdDSA.PublicKey) {
+        let privateKey = try EdDSA.PrivateKey(curve: .ed25519)
+        return (privateKey, privateKey.publicKey)
+    }
+
+    private func signToken(
+        privateKey: EdDSA.PrivateKey,
+        hardwareId: String,
+        nonce: String,
+        exp: Date = Date().addingTimeInterval(30 * 24 * 3600),
+        licenseId: String = "lic-001"
+    ) async throws -> String {
+        let payload = LicensePayload(
+            exp: .init(value: exp),
+            hardwareId: hardwareId,
+            iat: .init(value: Date()),
+            licenseId: licenseId,
+            nonce: nonce
+        )
+        let keys = await JWTKeyCollection().add(eddsa: privateKey)
+        return try await keys.sign(payload)
+    }
+
+    private func makeClient(
+        publicKey: EdDSA.PublicKey,
+        tokenStore: MockTokenStore = MockTokenStore(),
+        licenseClient: MockLicenseClient = MockLicenseClient()
+    ) -> (AmoreLicensing, MockTokenStore, MockLicenseClient) {
+        let client = AmoreLicensing(
+            publicKey: publicKey,
+            bundleIdentifier: bundleId,
+            tokenStore: tokenStore,
+            hardwareIdentifier: MockHardwareIdentifier(identifier: hardwareId),
+            licenseClient: licenseClient
+        )
+        return (client, tokenStore, licenseClient)
+    }
+
+    // MARK: - Activation
+
+    @Test func activationHardwareIdMismatch() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let mock = MockLicenseClient()
+        mock.onActivate = { _, _, nonce in
+            try await self.signToken(privateKey: privateKey, hardwareId: "OTHER-HW", nonce: nonce)
+        }
+        let (client, _, _) = makeClient(publicKey: publicKey, licenseClient: mock)
+
+        await #expect(throws: AmoreError.hardwareIdMismatch) {
+            try await client.activate(licenseKey: "KEY")
+        }
+    }
+
+    @Test func activationInvalidSignature() async throws {
+        let (_, publicKey) = try makeKeys()
+        let (wrongPrivate, _) = try makeKeys()
+        let mock = MockLicenseClient()
+        mock.onActivate = { [self] _, hwId, nonce in
+            try await signToken(privateKey: wrongPrivate, hardwareId: hwId, nonce: nonce)
+        }
+        let (client, _, _) = makeClient(publicKey: publicKey, licenseClient: mock)
+
+        await #expect(throws: AmoreError.invalidSignature) {
+            try await client.activate(licenseKey: "KEY")
+        }
+    }
+
+    @Test func activationNetworkFailure() async throws {
+        let (_, publicKey) = try makeKeys()
+        let mock = MockLicenseClient()
+        mock.onActivate = { _, _, _ in throw URLError(.notConnectedToInternet) }
+        let (client, _, _) = makeClient(publicKey: publicKey, licenseClient: mock)
+
+        await #expect(throws: AmoreError.self) {
+            try await client.activate(licenseKey: "KEY")
+        }
+    }
+
+    @Test func activationNonceMismatch() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let mock = MockLicenseClient()
+        mock.onActivate = { [self] _, hwId, _ in
+            try await signToken(privateKey: privateKey, hardwareId: hwId, nonce: "wrong-nonce")
+        }
+        let (client, _, _) = makeClient(publicKey: publicKey, licenseClient: mock)
+
+        await #expect(throws: AmoreError.nonceMismatch) {
+            try await client.activate(licenseKey: "KEY")
+        }
+    }
+
+    @Test func activationSuccess() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let mock = MockLicenseClient()
+        mock.onActivate = { [self] _, hwId, nonce in
+            try await signToken(privateKey: privateKey, hardwareId: hwId, nonce: nonce)
+        }
+        let (client, store, _) = makeClient(publicKey: publicKey, licenseClient: mock)
+
+        try await client.activate(licenseKey: "VALID-KEY")
+
+        guard case .valid = client.status else {
+            Issue.record("Expected valid, got \(client.status)")
+            return
+        }
+        #expect(try store.retrieve() != nil)
+    }
+
+    // MARK: - Validation
+
+    @Test func validateExpiredTokenGracePeriod() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let store = MockTokenStore()
+        let expDate = Date().addingTimeInterval(-2 * 24 * 3600) // expired 2 days ago
+        let expired = try await signToken(
+            privateKey: privateKey, hardwareId: hardwareId, nonce: "old",
+            exp: expDate
+        )
+        try store.store(expired)
+
+        let mock = MockLicenseClient()
+        mock.onRefresh = { _, _, _ in throw URLError(.notConnectedToInternet) }
+        let (client, _, _) = makeClient(publicKey: publicKey, tokenStore: store, licenseClient: mock)
+
+        let result = try await client.validate()
+
+        guard case .gracePeriod(let until) = result else {
+            Issue.record("Expected gracePeriod, got \(result)")
+            return
+        }
+        let expectedEnd = expDate.addingTimeInterval(7 * 86_400)
+        #expect(abs(until.timeIntervalSince(expectedEnd)) < 1)
+    }
+
+    @Test func validateExpiredTokenRefreshes() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let store = MockTokenStore()
+        let expired = try await signToken(
+            privateKey: privateKey, hardwareId: hardwareId, nonce: "old",
+            exp: Date().addingTimeInterval(-100)
+        )
+        try store.store(expired)
+
+        let mock = MockLicenseClient()
+        mock.onRefresh = { [self] hwId, _, nonce in
+            try await signToken(privateKey: privateKey, hardwareId: hwId, nonce: nonce)
+        }
+        let (client, _, _) = makeClient(publicKey: publicKey, tokenStore: store, licenseClient: mock)
+
+        let result = try await client.validate()
+
+        guard case .valid = result, case .valid = client.status else {
+            Issue.record("Expected valid, got \(result)")
+            return
+        }
+    }
+
+    @Test func validateGracePeriodExpired() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let store = MockTokenStore()
+        let expired = try await signToken(
+            privateKey: privateKey, hardwareId: hardwareId, nonce: "old",
+            exp: Date().addingTimeInterval(-10 * 24 * 3600) // expired 10 days ago
+        )
+        try store.store(expired)
+
+        let mock = MockLicenseClient()
+        mock.onRefresh = { _, _, _ in throw URLError(.notConnectedToInternet) }
+        let (client, _, _) = makeClient(publicKey: publicKey, tokenStore: store, licenseClient: mock)
+
+        let result = try await client.validate()
+
+        #expect(result == .invalid)
+        #expect(client.status == .invalid)
+    }
+
+    @Test func validateHardwareIdMismatchOnStoredToken() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let store = MockTokenStore()
+        let token = try await signToken(privateKey: privateKey, hardwareId: "OTHER-HW", nonce: "n")
+        try store.store(token)
+        let (client, _, _) = makeClient(publicKey: publicKey, tokenStore: store)
+
+        await #expect(throws: AmoreError.hardwareIdMismatch) {
+            try await client.validate()
+        }
+        #expect(client.status == .invalid)
+    }
+
+    @Test func validateNoStoredToken() async throws {
+        let (_, publicKey) = try makeKeys()
+        let (client, _, _) = makeClient(publicKey: publicKey)
+
+        await #expect(throws: AmoreError.noStoredToken) {
+            try await client.validate()
+        }
+    }
+
+    @Test func validateValidStoredToken() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let store = MockTokenStore()
+        let token = try await signToken(privateKey: privateKey, hardwareId: hardwareId, nonce: "stored")
+        try store.store(token)
+        let (client, _, _) = makeClient(publicKey: publicKey, tokenStore: store)
+
+        let result = try await client.validate()
+
+        guard case .valid = result, case .valid = client.status else {
+            Issue.record("Expected valid, got \(result)")
+            return
+        }
+    }
+}
