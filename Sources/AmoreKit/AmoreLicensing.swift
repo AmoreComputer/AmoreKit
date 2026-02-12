@@ -65,7 +65,7 @@ public final class AmoreLicensing: Licensing {
         }
         let payload = try await verifyToken(token, expectedNonce: nonce)
         do { try tokenStore.store(token) } catch { throw .keychain(error) }
-        status = .valid(until: payload.exp.value)
+        status = .valid(License(from: payload))
     }
     
     public func deactivate() async throws(AmoreError) {
@@ -102,9 +102,8 @@ public final class AmoreLicensing: Licensing {
                 status = .invalid
                 throw AmoreError.hardwareIdMismatch
             }
-            let validUntil = payload.exp.value
-            status = .valid(until: validUntil)
-            return .valid(until: validUntil)
+            status = .valid(License(from: payload))
+            return status
         } catch let error as AmoreError {
             throw error
         } catch {
@@ -126,16 +125,18 @@ public final class AmoreLicensing: Licensing {
         
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
-        guard let payload = try? decoder.decode(GracePeriodPayload.self, from: payloadData) else {
+        guard let payload = try? decoder.decode(LicensePayload.self, from: payloadData) else {
             status = .invalid
             return .invalid
         }
         
-        let graceEnd = payload.exp.addingTimeInterval(configuration.gracePeriod.timeInterval)
+        let graceEnd = payload.exp.value.addingTimeInterval(configuration.gracePeriod.timeInterval)
+        var license = License(from: payload)
+        license.expiresAt = graceEnd
         
         if graceEnd > Date() {
-            status = .gracePeriod(until: graceEnd)
-            return .gracePeriod(until: graceEnd)
+            status = .gracePeriod(license)
+            return status
         } else {
             status = .invalid
             return .invalid
@@ -150,9 +151,8 @@ public final class AmoreLicensing: Licensing {
             )
             let payload = try await verifyToken(newToken, expectedNonce: nonce)
             do { try tokenStore.store(newToken) } catch { throw AmoreError.keychain(error) }
-            let validUntil = payload.exp.value
-            status = .valid(until: validUntil)
-            return .valid(until: validUntil)
+            status = .valid(License(from: payload))
+            return status
         } catch let error as ClientError {
             throw .client(error)
         } catch let error as AmoreError {
@@ -175,10 +175,6 @@ public final class AmoreLicensing: Licensing {
         guard payload.hardwareId == hardwareIdentifier.identifier else { throw .hardwareIdMismatch }
         return payload
     }
-}
-
-private struct GracePeriodPayload: Decodable {
-    let exp: Date
 }
 
 private extension Data {

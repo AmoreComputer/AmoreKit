@@ -1,8 +1,8 @@
 import Foundation
 
 public enum ValidationStatus: Sendable, Equatable {
-    case gracePeriod(until: Date)
+    case gracePeriod(License)
     case invalid
     case unknown
-    case valid(until: Date)
+    case valid(License)
 }

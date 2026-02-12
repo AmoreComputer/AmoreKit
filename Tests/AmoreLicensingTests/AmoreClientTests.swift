@@ -19,7 +19,7 @@ import Testing
         hardwareId: String,
         nonce: String,
         exp: Date = Date().addingTimeInterval(30 * 24 * 3600),
-        licenseId: String = "lic-001"
+        licenseId: UUID = UUID()
     ) async throws -> String {
         let payload = LicensePayload(
             exp: .init(value: exp),
@@ -186,12 +186,12 @@ import Testing
 
         let result = try await client.validate()
 
-        guard case .gracePeriod(let until) = result else {
+        guard case .gracePeriod(let license) = result else {
             Issue.record("Expected gracePeriod, got \(result)")
             return
         }
         let expectedEnd = expDate.addingTimeInterval(7 * 86_400)
-        #expect(abs(until.timeIntervalSince(expectedEnd)) < 1)
+        #expect(abs(license.expiresAt!.timeIntervalSince(expectedEnd)) < 1)
     }
 
     @Test func validateExpiredTokenValidates() async throws {
