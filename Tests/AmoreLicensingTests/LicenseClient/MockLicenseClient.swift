@@ -5,7 +5,7 @@ final class MockLicenseClient: LicenseClient, @unchecked Sendable {
     var onDeactivate: ((String) async throws -> Void)?
     var onValidate: ((String, String) async throws -> String)?
 
-    func activate(licenseKey: String, hardwareId: String, nonce: String) async throws -> String {
+    func activate(licenseKey: String, hardwareId: String, nonce: String, name: String?) async throws -> String {
         guard let handler = onActivate else {
             throw AmoreError.client(.licensingNotConfigured)
         }

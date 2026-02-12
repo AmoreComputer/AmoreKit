@@ -1,7 +1,6 @@
 import Foundation
 import JWTKit
 
-@MainActor
 @Observable
 public final class AmoreLicensing: Licensing {
     public private(set) var status: ValidationStatus = .unknown
@@ -54,7 +53,8 @@ public final class AmoreLicensing: Licensing {
         let token: String
         do {
             token = try await licenseClient.activate(
-                licenseKey: licenseKey, hardwareId: hardwareIdentifier.identifier, nonce: nonce
+                licenseKey: licenseKey, hardwareId: hardwareIdentifier.identifier, nonce: nonce,
+                name: Host.current().localizedName
             )
         } catch let error as ClientError {
             throw .client(error)

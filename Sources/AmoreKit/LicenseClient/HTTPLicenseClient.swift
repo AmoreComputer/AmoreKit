@@ -7,8 +7,8 @@ struct HTTPLicenseClient: LicenseClient {
         self.server = server
     }
     
-    func activate(licenseKey: String, hardwareId: String, nonce: String) async throws -> String {
-        let body = ActivateRequest(licenseKey: licenseKey, hardwareId: hardwareId, nonce: nonce)
+    func activate(licenseKey: String, hardwareId: String, nonce: String, name: String?) async throws -> String {
+        let body = ActivateRequest(licenseKey: licenseKey, hardwareId: hardwareId, nonce: nonce, name: name)
         return try await post(path: server.activatePath, body: body)
     }
     
@@ -60,6 +60,7 @@ private struct ActivateRequest: Encodable {
     let licenseKey: String
     let hardwareId: String
     let nonce: String
+    let name: String?
 }
 
 private struct DeactivateRequest: Encodable {
