@@ -37,7 +37,7 @@ public enum ValidationStatus: Sendable, Equatable {
     case valid(until: Date)
 }
 
-public enum AmoreError: Error, Equatable, Sendable {
+public enum AmoreError: LocalizedError, Equatable, Sendable {
     case activationFailed(String)
     case hardwareIdMismatch
     case invalidSignature
@@ -45,4 +45,23 @@ public enum AmoreError: Error, Equatable, Sendable {
     case nonceMismatch
     case deactivationFailed(String)
     case noStoredToken
+
+    public var errorDescription: String? {
+        switch self {
+        case .activationFailed(let message):
+            return "Activation failed: \(message)"
+        case .hardwareIdMismatch:
+            return "This license is registered to a different device."
+        case .invalidSignature:
+            return "The server response has an invalid signature."
+        case .networkError(let message):
+            return "Network error: \(message)"
+        case .nonceMismatch:
+            return "The server response failed nonce verification."
+        case .deactivationFailed(let message):
+            return "Deactivation failed: \(message)"
+        case .noStoredToken:
+            return "No stored license token found."
+        }
+    }
 }
