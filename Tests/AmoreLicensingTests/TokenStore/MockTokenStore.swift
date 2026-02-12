@@ -3,15 +3,15 @@
 final class MockTokenStore: TokenStore, @unchecked Sendable {
     private var token: String?
 
-    func store(_ token: String) throws {
+    func store(_ token: String) throws(KeychainError) {
         self.token = token
     }
 
-    func retrieve() throws -> String? {
+    func retrieve() throws(KeychainError) -> String? {
         token
     }
 
-    func delete() throws {
+    func delete() throws(KeychainError) {
         token = nil
     }
 }

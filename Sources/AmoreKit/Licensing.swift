@@ -2,9 +2,9 @@ import Foundation
 
 @MainActor
 internal protocol Licensing: Sendable {
-    func activate(licenseKey: String) async throws
-    func deactivate() async throws
-    func validate() async throws -> ValidationStatus
+    func activate(licenseKey: String) async throws(AmoreError)
+    func deactivate() async throws(AmoreError)
+    func validate() async throws(AmoreError) -> ValidationStatus
     var status: ValidationStatus { get }
 }
 
@@ -37,31 +37,3 @@ public enum ValidationStatus: Sendable, Equatable {
     case valid(until: Date)
 }
 
-public enum AmoreError: LocalizedError, Equatable, Sendable {
-    case hardwareIdMismatch
-    case invalidSignature
-    case keychainError(String)
-    case networkError(String)
-    case nonceMismatch
-    case noStoredToken
-    case serverError(String)
-
-    public var errorDescription: String? {
-        switch self {
-        case .hardwareIdMismatch:
-            return "This license is registered to a different device."
-        case .invalidSignature:
-            return "The server response has an invalid signature."
-        case .keychainError(let message):
-            return "Keychain error: \(message)"
-        case .networkError(let message):
-            return "Network error: \(message)"
-        case .nonceMismatch:
-            return "The server response failed nonce verification."
-        case .noStoredToken:
-            return "No stored license token found."
-        case .serverError(let message):
-            return "Server error: \(message)"
-        }
-    }
-}

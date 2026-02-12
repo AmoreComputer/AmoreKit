@@ -5,14 +5,14 @@ import JWTKit
 @Observable
 public final class AmoreLicensing: Licensing {
     public private(set) var status: ValidationStatus = .unknown
-
+    
     private let bundleIdentifier: String
     private let configuration: LicensingConfiguration
     private let hardwareIdentifier: HardwareIdentifier
     private let licenseClient: LicenseClient
     private let publicKey: EdDSA.PublicKey
     private let tokenStore: TokenStore
-
+    
     public init(
         publicKey: String,
         bundleIdentifier: String? = nil,
@@ -27,12 +27,12 @@ public final class AmoreLicensing: Licensing {
         self.tokenStore = KeychainTokenStore(bundleIdentifier: bid)
         self.hardwareIdentifier = MacHardwareIdentifier()
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(bundleIdentifier: bid))
-
+        
         if autoValidate {
             Task { try? await validate() }
         }
     }
-
+    
     internal init(
         publicKey: EdDSA.PublicKey,
         bundleIdentifier: String,
@@ -48,8 +48,8 @@ public final class AmoreLicensing: Licensing {
         self.hardwareIdentifier = hardwareIdentifier
         self.licenseClient = licenseClient
     }
-
-    public func activate(licenseKey: String) async throws {
+    
+    public func activate(licenseKey: String) async throws(AmoreError) {
         let nonce = UUID().uuidString
         let token: String
         do {
@@ -57,43 +57,45 @@ public final class AmoreLicensing: Licensing {
                 licenseKey: licenseKey, hardwareId: hardwareIdentifier.identifier, nonce: nonce
             )
         } catch let error as ClientError {
-            throw error
+            throw .client(error)
         } catch let error as AmoreError {
             throw error
         } catch {
-            throw AmoreError.networkError(error.localizedDescription)
+            throw .network(NetworkError(message: error.localizedDescription))
         }
         let payload = try await verifyToken(token, expectedNonce: nonce)
-        try tokenStore.store(token)
+        do { try tokenStore.store(token) } catch { throw .keychain(error) }
         status = .valid(until: payload.exp.value)
     }
-
-    public func deactivate() async throws {
-        guard let token = try tokenStore.retrieve() else {
-            throw AmoreError.noStoredToken
-        }
+    
+    public func deactivate() async throws(AmoreError) {
+        let stored: String?
+        do { stored = try tokenStore.retrieve() } catch { throw .keychain(error) }
+        guard let token = stored else { throw .noStoredToken }
         do {
             try await licenseClient.deactivate(token: token)
         } catch let error as ClientError {
-            throw error
+            throw .client(error)
         } catch let error as AmoreError {
             throw error
         } catch {
-            throw AmoreError.networkError(error.localizedDescription)
+            throw .network(NetworkError(message: error.localizedDescription))
         }
-        try tokenStore.delete()
+        do { try tokenStore.delete() } catch { throw .keychain(error) }
         status = .unknown
     }
-
+    
     @discardableResult
-    public func validate() async throws -> ValidationStatus {
-        guard let token = try tokenStore.retrieve() else {
+    public func validate() async throws(AmoreError) -> ValidationStatus {
+        let stored: String?
+        do { stored = try tokenStore.retrieve() } catch { throw .keychain(error) }
+        guard let token = stored else {
             status = .unknown
-            throw AmoreError.noStoredToken
+            throw .noStoredToken
         }
-
+        
         let keys = await JWTKeyCollection().add(eddsa: publicKey)
-
+        
         do {
             let payload = try await keys.verify(token, as: LicensePayload.self)
             guard payload.hardwareId == hardwareIdentifier.identifier else {
@@ -110,10 +112,10 @@ public final class AmoreLicensing: Licensing {
             return try await handleExpiredToken(token, keys: keys)
         }
     }
-
+    
     // MARK: - Private
-
-    private func applyGracePeriod(token: String, keys: JWTKeyCollection) throws -> ValidationStatus {
+    
+    private func applyGracePeriod(token: String, keys: JWTKeyCollection) -> ValidationStatus {
         let parts = token.split(separator: ".")
         guard parts.count == 3,
               let payloadData = Data(base64URLDecoded: String(parts[1]))
@@ -121,16 +123,16 @@ public final class AmoreLicensing: Licensing {
             status = .invalid
             return .invalid
         }
-
+        
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
         guard let payload = try? decoder.decode(GracePeriodPayload.self, from: payloadData) else {
             status = .invalid
             return .invalid
         }
-
+        
         let graceEnd = payload.exp.addingTimeInterval(configuration.gracePeriod.timeInterval)
-
+        
         if graceEnd > Date() {
             status = .gracePeriod(until: graceEnd)
             return .gracePeriod(until: graceEnd)
@@ -139,38 +141,38 @@ public final class AmoreLicensing: Licensing {
             return .invalid
         }
     }
-
-    private func handleExpiredToken(_ token: String, keys: JWTKeyCollection) async throws -> ValidationStatus {
+    
+    private func handleExpiredToken(_ token: String, keys: JWTKeyCollection) async throws(AmoreError) -> ValidationStatus {
         let nonce = UUID().uuidString
         do {
             let newToken = try await licenseClient.validate(
                 token: token, nonce: nonce
             )
             let payload = try await verifyToken(newToken, expectedNonce: nonce)
-            try tokenStore.store(newToken)
+            do { try tokenStore.store(newToken) } catch { throw AmoreError.keychain(error) }
             let validUntil = payload.exp.value
             status = .valid(until: validUntil)
             return .valid(until: validUntil)
         } catch let error as ClientError {
-            throw error
+            throw .client(error)
         } catch let error as AmoreError {
             throw error
         } catch {
-            return try applyGracePeriod(token: token, keys: keys)
+            return applyGracePeriod(token: token, keys: keys)
         }
     }
-
+    
     @discardableResult
-    private func verifyToken(_ token: String, expectedNonce: String) async throws -> LicensePayload {
+    private func verifyToken(_ token: String, expectedNonce: String) async throws(AmoreError) -> LicensePayload {
         let keys = await JWTKeyCollection().add(eddsa: publicKey)
         let payload: LicensePayload
         do {
             payload = try await keys.verify(token, as: LicensePayload.self)
         } catch {
-            throw AmoreError.invalidSignature
+            throw .invalidSignature
         }
-        guard payload.nonce == expectedNonce else { throw AmoreError.nonceMismatch }
-        guard payload.hardwareId == hardwareIdentifier.identifier else { throw AmoreError.hardwareIdMismatch }
+        guard payload.nonce == expectedNonce else { throw .nonceMismatch }
+        guard payload.hardwareId == hardwareIdentifier.identifier else { throw .hardwareIdMismatch }
         return payload
     }
 }

@@ -1,5 +1,5 @@
 protocol TokenStore: Sendable {
-    func store(_ token: String) throws
-    func retrieve() throws -> String?
-    func delete() throws
+    func store(_ token: String) throws(KeychainError)
+    func retrieve() throws(KeychainError) -> String?
+    func delete() throws(KeychainError)
 }

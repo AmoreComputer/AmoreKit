@@ -4,12 +4,12 @@ import Security
 struct KeychainTokenStore: TokenStore {
     private let service: String
     private let account = "computer.amore.license"
-
+    
     init(bundleIdentifier: String) {
         self.service = bundleIdentifier
     }
-
-    func delete() throws {
+    
+    func delete() throws(KeychainError) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -17,11 +17,11 @@ struct KeychainTokenStore: TokenStore {
         ]
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw AmoreError.keychainError("Keychain delete failed: \(status)")
+            throw .deleteFailed(status)
         }
     }
-
-    func retrieve() throws -> String? {
+    
+    func retrieve() throws(KeychainError) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -33,12 +33,12 @@ struct KeychainTokenStore: TokenStore {
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess, let data = result as? Data else {
             if status == errSecItemNotFound { return nil }
-            throw AmoreError.keychainError("Keychain retrieve failed: \(status)")
+            throw .retrieveFailed(status)
         }
         return String(data: data, encoding: .utf8)
     }
-
-    func store(_ token: String) throws {
+    
+    func store(_ token: String) throws(KeychainError) {
         try? delete()
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -48,7 +48,7 @@ struct KeychainTokenStore: TokenStore {
         ]
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else {
-            throw AmoreError.keychainError("Keychain store failed: \(status)")
+            throw .storeFailed(status)
         }
     }
 }

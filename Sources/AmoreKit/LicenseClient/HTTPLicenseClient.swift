@@ -39,12 +39,12 @@ struct HTTPLicenseClient: LicenseClient {
     
     private func serverError(from data: Data) -> any Error {
         guard let body = try? JSONDecoder().decode(ErrorResponse.self, from: data) else {
-            return AmoreError.serverError("An unknown error occurred")
+            return NetworkError(message: "An unknown error occurred")
         }
         if let clientError = ClientError(rawValue: body.error) {
             return clientError
         }
-        return AmoreError.serverError(body.message)
+        return NetworkError(message: body.message)
     }
     
     private func send<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {
