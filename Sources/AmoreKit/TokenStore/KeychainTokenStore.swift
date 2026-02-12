@@ -17,7 +17,7 @@ struct KeychainTokenStore: TokenStore {
         ]
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw AmoreError.activationFailed("Keychain delete failed: \(status)")
+            throw AmoreError.keychainError("Keychain delete failed: \(status)")
         }
     }
 
@@ -33,7 +33,7 @@ struct KeychainTokenStore: TokenStore {
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess, let data = result as? Data else {
             if status == errSecItemNotFound { return nil }
-            throw AmoreError.activationFailed("Keychain retrieve failed: \(status)")
+            throw AmoreError.keychainError("Keychain retrieve failed: \(status)")
         }
         return String(data: data, encoding: .utf8)
     }
@@ -48,7 +48,7 @@ struct KeychainTokenStore: TokenStore {
         ]
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else {
-            throw AmoreError.activationFailed("Keychain store failed: \(status)")
+            throw AmoreError.keychainError("Keychain store failed: \(status)")
         }
     }
 }

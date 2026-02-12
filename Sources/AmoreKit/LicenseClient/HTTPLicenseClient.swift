@@ -2,46 +2,51 @@ import Foundation
 
 struct HTTPLicenseClient: LicenseClient {
     private let server: LicenseServer
-
+    
     init(server: LicenseServer) {
         self.server = server
     }
-
+    
     func activate(licenseKey: String, hardwareId: String, nonce: String) async throws -> String {
         let body = ActivateRequest(licenseKey: licenseKey, hardwareId: hardwareId, nonce: nonce)
         return try await post(path: server.activatePath, body: body)
     }
-
+    
     func deactivate(token: String) async throws {
         let body = DeactivateRequest(token: token)
         try await postVoid(path: server.deactivatePath, body: body)
     }
-
+    
     func validate(token: String, nonce: String) async throws -> String {
         let body = ValidateRequest(token: token, nonce: nonce)
         return try await post(path: server.validatePath, body: body)
     }
-
+    
     private func post<T: Encodable>(path: String, body: T) async throws -> String {
         let (data, response) = try await send(path: path, body: body)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw AmoreError.activationFailed(serverMessage(from: data))
+            throw serverError(from: data)
         }
         return try JSONDecoder().decode(TokenResponse.self, from: data).token
     }
-
+    
     private func postVoid<T: Encodable>(path: String, body: T) async throws {
         let (data, response) = try await send(path: path, body: body)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw AmoreError.deactivationFailed(serverMessage(from: data))
+            throw serverError(from: data)
         }
     }
-
-    private func serverMessage(from data: Data) -> String {
-        (try? JSONDecoder().decode(ErrorResponse.self, from: data).message)
-            ?? "An unknown error occurred"
+    
+    private func serverError(from data: Data) -> any Error {
+        guard let body = try? JSONDecoder().decode(ErrorResponse.self, from: data) else {
+            return AmoreError.serverError("An unknown error occurred")
+        }
+        if let clientError = ClientError(rawValue: body.error) {
+            return clientError
+        }
+        return AmoreError.serverError(body.message)
     }
-
+    
     private func send<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {
         var request = URLRequest(url: server.url.appendingPathComponent(path))
         request.httpMethod = "POST"
@@ -71,5 +76,6 @@ private struct TokenResponse: Decodable {
 }
 
 private struct ErrorResponse: Decodable {
+    let error: String
     let message: String
 }

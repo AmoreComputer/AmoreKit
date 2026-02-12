@@ -56,6 +56,10 @@ public final class AmoreLicensing: Licensing {
             token = try await licenseClient.activate(
                 licenseKey: licenseKey, hardwareId: hardwareIdentifier.identifier, nonce: nonce
             )
+        } catch let error as ClientError {
+            throw error
+        } catch let error as AmoreError {
+            throw error
         } catch {
             throw AmoreError.networkError(error.localizedDescription)
         }
@@ -70,8 +74,12 @@ public final class AmoreLicensing: Licensing {
         }
         do {
             try await licenseClient.deactivate(token: token)
+        } catch let error as ClientError {
+            throw error
+        } catch let error as AmoreError {
+            throw error
         } catch {
-            throw AmoreError.deactivationFailed(error.localizedDescription)
+            throw AmoreError.networkError(error.localizedDescription)
         }
         try tokenStore.delete()
         status = .unknown
@@ -143,6 +151,8 @@ public final class AmoreLicensing: Licensing {
             let validUntil = payload.exp.value
             status = .valid(until: validUntil)
             return .valid(until: validUntil)
+        } catch let error as ClientError {
+            throw error
         } catch let error as AmoreError {
             throw error
         } catch {
