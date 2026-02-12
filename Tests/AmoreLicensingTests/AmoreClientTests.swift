@@ -130,7 +130,7 @@ import Testing
         try store.store(expired)
 
         let mock = MockLicenseClient()
-        mock.onRefresh = { _, _, _ in throw URLError(.notConnectedToInternet) }
+        mock.onValidate = { _, _ in throw URLError(.notConnectedToInternet) }
         let (client, _, _) = makeClient(publicKey: publicKey, tokenStore: store, licenseClient: mock)
 
         let result = try await client.validate()
@@ -143,7 +143,7 @@ import Testing
         #expect(abs(until.timeIntervalSince(expectedEnd)) < 1)
     }
 
-    @Test func validateExpiredTokenRefreshes() async throws {
+    @Test func validateExpiredTokenValidates() async throws {
         let (privateKey, publicKey) = try makeKeys()
         let store = MockTokenStore()
         let expired = try await signToken(
@@ -153,8 +153,8 @@ import Testing
         try store.store(expired)
 
         let mock = MockLicenseClient()
-        mock.onRefresh = { [self] hwId, _, nonce in
-            try await signToken(privateKey: privateKey, hardwareId: hwId, nonce: nonce)
+        mock.onValidate = { [self] _, nonce in
+            try await signToken(privateKey: privateKey, hardwareId: hardwareId, nonce: nonce)
         }
         let (client, _, _) = makeClient(publicKey: publicKey, tokenStore: store, licenseClient: mock)
 
@@ -176,7 +176,7 @@ import Testing
         try store.store(expired)
 
         let mock = MockLicenseClient()
-        mock.onRefresh = { _, _, _ in throw URLError(.notConnectedToInternet) }
+        mock.onValidate = { _, _ in throw URLError(.notConnectedToInternet) }
         let (client, _, _) = makeClient(publicKey: publicKey, tokenStore: store, licenseClient: mock)
 
         let result = try await client.validate()

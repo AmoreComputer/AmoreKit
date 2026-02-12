@@ -18,7 +18,7 @@ public final class AmoreLicensing: Licensing {
         bundleIdentifier: String? = nil,
         autoValidate: Bool = false,
         configuration: LicensingConfiguration = .default,
-        serverURL: URL = .amoreServer,
+        server: LicenseServer? = nil,
     ) throws {
         let bid = bundleIdentifier ?? Bundle.main.bundleIdentifier ?? publicKey
         self.configuration = configuration
@@ -26,7 +26,7 @@ public final class AmoreLicensing: Licensing {
         self.bundleIdentifier = bid
         self.tokenStore = KeychainTokenStore(bundleIdentifier: bid)
         self.hardwareIdentifier = MacHardwareIdentifier()
-        self.licenseClient = HTTPLicenseClient(serverURL: serverURL)
+        self.licenseClient = HTTPLicenseClient(server: server ?? .amore(bundleIdentifier: bid))
 
         if autoValidate {
             Task { try? await validate() }
@@ -122,8 +122,8 @@ public final class AmoreLicensing: Licensing {
     private func handleExpiredToken(_ token: String, keys: JWTKeyCollection) async throws -> ValidationStatus {
         let nonce = UUID().uuidString
         do {
-            let newToken = try await licenseClient.refresh(
-                hardwareId: hardwareIdentifier.identifier, oldToken: token, nonce: nonce
+            let newToken = try await licenseClient.validate(
+                token: token, nonce: nonce
             )
             let payload = try await verifyToken(newToken, expectedNonce: nonce)
             try tokenStore.store(newToken)
