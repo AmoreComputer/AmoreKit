@@ -22,7 +22,6 @@ let package = Package(
             dependencies: [
                 .product(name: "JWTKit", package: "jwt-kit"),
             ],
-            path: "Sources/AmoreKit"
         ),
         .executableTarget(
             name: "Sandbox",
