@@ -2,7 +2,7 @@
 
 final class MockLicenseClient: LicenseClient, @unchecked Sendable {
     var onActivate: ((String, String, String) async throws -> String)?
-    var onDeactivate: ((String, String) async throws -> Void)?
+    var onDeactivate: ((String) async throws -> Void)?
     var onValidate: ((String, String) async throws -> String)?
 
     func activate(licenseKey: String, hardwareId: String, nonce: String) async throws -> String {
@@ -12,11 +12,11 @@ final class MockLicenseClient: LicenseClient, @unchecked Sendable {
         return try await handler(licenseKey, hardwareId, nonce)
     }
 
-    func deactivate(hardwareId: String, token: String) async throws {
+    func deactivate(token: String) async throws {
         guard let handler = onDeactivate else {
             throw AmoreError.deactivationFailed("not configured")
         }
-        try await handler(hardwareId, token)
+        try await handler(token)
     }
 
     func validate(token: String, nonce: String) async throws -> String {

@@ -126,7 +126,7 @@ import Testing
         mock.onActivate = { [self] _, hwId, nonce in
             try await signToken(privateKey: privateKey, hardwareId: hwId, nonce: nonce)
         }
-        mock.onDeactivate = { _, _ in serverCalled = true }
+        mock.onDeactivate = { _ in serverCalled = true }
         let (client, store, _) = makeClient(publicKey: publicKey, licenseClient: mock)
 
         try await client.activate(licenseKey: "KEY")
@@ -152,7 +152,7 @@ import Testing
         mock.onActivate = { [self] _, hwId, nonce in
             try await signToken(privateKey: privateKey, hardwareId: hwId, nonce: nonce)
         }
-        mock.onDeactivate = { _, _ in throw URLError(.notConnectedToInternet) }
+        mock.onDeactivate = { _ in throw URLError(.notConnectedToInternet) }
         let (client, store, _) = makeClient(publicKey: publicKey, licenseClient: mock)
 
         try await client.activate(licenseKey: "KEY")

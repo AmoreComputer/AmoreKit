@@ -12,8 +12,8 @@ struct HTTPLicenseClient: LicenseClient {
         return try await post(path: server.activatePath, body: body)
     }
 
-    func deactivate(hardwareId: String, token: String) async throws {
-        let body = DeactivateRequest(hardwareId: hardwareId, token: token)
+    func deactivate(token: String) async throws {
+        let body = DeactivateRequest(token: token)
         try await postVoid(path: server.deactivatePath, body: body)
     }
 
@@ -25,16 +25,21 @@ struct HTTPLicenseClient: LicenseClient {
     private func post<T: Encodable>(path: String, body: T) async throws -> String {
         let (data, response) = try await send(path: path, body: body)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw AmoreError.activationFailed("Server returned error")
+            throw AmoreError.activationFailed(serverMessage(from: data))
         }
         return try JSONDecoder().decode(TokenResponse.self, from: data).token
     }
 
     private func postVoid<T: Encodable>(path: String, body: T) async throws {
-        let (_, response) = try await send(path: path, body: body)
+        let (data, response) = try await send(path: path, body: body)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw AmoreError.deactivationFailed("Server returned error")
+            throw AmoreError.deactivationFailed(serverMessage(from: data))
         }
+    }
+
+    private func serverMessage(from data: Data) -> String {
+        (try? JSONDecoder().decode(ErrorResponse.self, from: data).message)
+            ?? "An unknown error occurred"
     }
 
     private func send<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {
@@ -53,7 +58,6 @@ private struct ActivateRequest: Encodable {
 }
 
 private struct DeactivateRequest: Encodable {
-    let hardwareId: String
     let token: String
 }
 
@@ -64,4 +68,8 @@ private struct ValidateRequest: Encodable {
 
 private struct TokenResponse: Decodable {
     let token: String
+}
+
+private struct ErrorResponse: Decodable {
+    let message: String
 }

@@ -69,7 +69,7 @@ public final class AmoreLicensing: Licensing {
             throw AmoreError.noStoredToken
         }
         do {
-            try await licenseClient.deactivate(hardwareId: hardwareIdentifier.identifier, token: token)
+            try await licenseClient.deactivate(token: token)
         } catch {
             throw AmoreError.deactivationFailed(error.localizedDescription)
         }
