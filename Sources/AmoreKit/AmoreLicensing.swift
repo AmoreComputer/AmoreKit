@@ -64,6 +64,19 @@ public final class AmoreLicensing: Licensing {
         status = .valid(until: payload.exp.value)
     }
 
+    public func deactivate() async throws {
+        guard let token = try tokenStore.retrieve() else {
+            throw AmoreError.noStoredToken
+        }
+        do {
+            try await licenseClient.deactivate(hardwareId: hardwareIdentifier.identifier, token: token)
+        } catch {
+            throw AmoreError.deactivationFailed(error.localizedDescription)
+        }
+        try tokenStore.delete()
+        status = .unknown
+    }
+
     @discardableResult
     public func validate() async throws -> ValidationStatus {
         guard let token = try tokenStore.retrieve() else {

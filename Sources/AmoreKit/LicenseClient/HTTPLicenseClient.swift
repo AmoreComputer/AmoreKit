@@ -12,22 +12,37 @@ struct HTTPLicenseClient: LicenseClient {
         return try await post(path: server.activatePath, body: body)
     }
 
+    func deactivate(hardwareId: String, token: String) async throws {
+        let body = DeactivateRequest(hardwareId: hardwareId, token: token)
+        try await postVoid(path: server.deactivatePath, body: body)
+    }
+
     func validate(token: String, nonce: String) async throws -> String {
         let body = ValidateRequest(token: token, nonce: nonce)
         return try await post(path: server.validatePath, body: body)
     }
 
     private func post<T: Encodable>(path: String, body: T) async throws -> String {
-        var request = URLRequest(url: server.url.appendingPathComponent(path))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await send(path: path, body: body)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw AmoreError.activationFailed("Server returned error")
         }
         return try JSONDecoder().decode(TokenResponse.self, from: data).token
+    }
+
+    private func postVoid<T: Encodable>(path: String, body: T) async throws {
+        let (_, response) = try await send(path: path, body: body)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw AmoreError.deactivationFailed("Server returned error")
+        }
+    }
+
+    private func send<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {
+        var request = URLRequest(url: server.url.appendingPathComponent(path))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(body)
+        return try await URLSession.shared.data(for: request)
     }
 }
 
@@ -35,6 +50,11 @@ private struct ActivateRequest: Encodable {
     let licenseKey: String
     let hardwareId: String
     let nonce: String
+}
+
+private struct DeactivateRequest: Encodable {
+    let hardwareId: String
+    let token: String
 }
 
 private struct ValidateRequest: Encodable {

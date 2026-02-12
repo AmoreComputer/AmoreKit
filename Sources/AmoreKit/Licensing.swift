@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 internal protocol Licensing: Sendable {
     func activate(licenseKey: String) async throws
+    func deactivate() async throws
     func validate() async throws -> ValidationStatus
     var status: ValidationStatus { get }
 }
@@ -42,5 +43,6 @@ public enum AmoreError: Error, Equatable, Sendable {
     case invalidSignature
     case networkError(String)
     case nonceMismatch
+    case deactivationFailed(String)
     case noStoredToken
 }

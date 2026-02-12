@@ -117,6 +117,57 @@ import Testing
         #expect(try store.retrieve() != nil)
     }
 
+    // MARK: - Deactivation
+
+    @Test func deactivationSuccess() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let mock = MockLicenseClient()
+        var serverCalled = false
+        mock.onActivate = { [self] _, hwId, nonce in
+            try await signToken(privateKey: privateKey, hardwareId: hwId, nonce: nonce)
+        }
+        mock.onDeactivate = { _, _ in serverCalled = true }
+        let (client, store, _) = makeClient(publicKey: publicKey, licenseClient: mock)
+
+        try await client.activate(licenseKey: "KEY")
+        try await client.deactivate()
+
+        #expect(client.status == .unknown)
+        #expect(try store.retrieve() == nil)
+        #expect(serverCalled)
+    }
+
+    @Test func deactivationNoStoredToken() async throws {
+        let (_, publicKey) = try makeKeys()
+        let (client, _, _) = makeClient(publicKey: publicKey)
+
+        await #expect(throws: AmoreError.noStoredToken) {
+            try await client.deactivate()
+        }
+    }
+
+    @Test func deactivationNetworkFailure() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let mock = MockLicenseClient()
+        mock.onActivate = { [self] _, hwId, nonce in
+            try await signToken(privateKey: privateKey, hardwareId: hwId, nonce: nonce)
+        }
+        mock.onDeactivate = { _, _ in throw URLError(.notConnectedToInternet) }
+        let (client, store, _) = makeClient(publicKey: publicKey, licenseClient: mock)
+
+        try await client.activate(licenseKey: "KEY")
+        let tokenBefore = try store.retrieve()
+
+        await #expect(throws: AmoreError.self) {
+            try await client.deactivate()
+        }
+        #expect(try store.retrieve() == tokenBefore)
+        guard case .valid = client.status else {
+            Issue.record("Expected status to remain valid, got \(client.status)")
+            return
+        }
+    }
+
     // MARK: - Validation
 
     @Test func validateExpiredTokenGracePeriod() async throws {
