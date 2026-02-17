@@ -1,3 +1,4 @@
+/// A type-safe identifier for a license entitlement.
 public struct LicenseEntitlement: Hashable, Codable, RawRepresentable, ExpressibleByStringLiteral, Sendable {
     
     public var rawValue: String

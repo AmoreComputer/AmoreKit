@@ -1,5 +1,6 @@
 import Foundation
 
+/// Errors from keychain operations used to store and retrieve license tokens.
 public enum KeychainError: LocalizedError, Equatable, Sendable {
     case deleteFailed(OSStatus)
     case retrieveFailed(OSStatus)

@@ -1,8 +1,12 @@
 import Foundation
 import JWTKit
 
+/// Manages license activation, deactivation, and validation against an Amore licensing server.
+///
+/// Observes ``status`` to reactively update UI based on the current validation state.
 @Observable
 public final class AmoreLicensing: Licensing {
+    /// The current validation status of the license.
     public private(set) var status: ValidationStatus = .unknown
     
     private let autoValidate: Bool
@@ -16,6 +20,13 @@ public final class AmoreLicensing: Licensing {
     private var keysReady = false
     private var validationTask: Task<Void, Never>?
     
+    /// Creates a new licensing instance.
+    /// - Parameters:
+    ///   - publicKey: The Ed25519 public key used to verify server responses.
+    ///   - bundleIdentifier: The app's bundle identifier. Defaults to `Bundle.main.bundleIdentifier`.
+    ///   - autoValidate: Whether to validate the license automatically on init and periodically. Defaults to `false`.
+    ///   - configuration: The licensing configuration. Defaults to ``LicensingConfiguration/default``.
+    ///   - server: The license server to use. Defaults to the Amore server.
     public init(
         publicKey: String,
         bundleIdentifier: String? = nil,
@@ -58,6 +69,9 @@ public final class AmoreLicensing: Licensing {
         validationTask?.cancel()
     }
     
+    /// Activates a license on this device using the given license key.
+    /// - Parameter licenseKey: The license key to activate.
+    /// - Throws: ``AmoreError`` if activation fails.
     public func activate(licenseKey: String) async throws(AmoreError) {
         let nonce = UUID().uuidString
         let token: String
@@ -79,6 +93,8 @@ public final class AmoreLicensing: Licensing {
         if autoValidate { startAutoValidation() }
     }
     
+    /// Deactivates the current license on this device.
+    /// - Throws: ``AmoreError`` if deactivation fails.
     public func deactivate() async throws(AmoreError) {
         stopAutoValidation()
         let stored: String?
@@ -97,6 +113,9 @@ public final class AmoreLicensing: Licensing {
         status = .unknown
     }
     
+    /// Validates the stored license token and updates ``status``.
+    /// - Returns: The resulting ``ValidationStatus``.
+    /// - Throws: ``AmoreError`` if validation fails.
     @discardableResult
     public func validate() async throws(AmoreError) -> ValidationStatus {
         let stored: String?

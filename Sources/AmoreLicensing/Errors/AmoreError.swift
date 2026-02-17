@@ -1,12 +1,20 @@
 import Foundation
 
+/// Errors thrown by AmoreLicensing operations.
 public enum AmoreError: LocalizedError, Equatable, Sendable {
+    /// A server-returned client error.
     case client(ClientError)
+    /// The license token's hardware ID does not match this device.
     case hardwareIdMismatch
+    /// The server response has an invalid cryptographic signature.
     case invalidSignature
+    /// A keychain operation failed.
     case keychain(KeychainError)
+    /// A network request failed.
     case network(NetworkError)
+    /// The server response failed nonce verification.
     case nonceMismatch
+    /// No license token is stored locally.
     case noStoredToken
     
     public var errorDescription: String? {

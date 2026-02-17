@@ -1,5 +1,6 @@
 import Foundation
 
+/// Errors returned by the licensing server.
 public enum ClientError: String, LocalizedError, Sendable, Decodable {
     case activationNotFound
     case appNotFound
