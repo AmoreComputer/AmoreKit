@@ -45,3 +45,26 @@ case .unknown:
 ## Deactivate
 
 You can deactivate a user's license via ``AmoreLicensing/deactivate()``, remove the license activation on the server and delete the local copy.
+
+## Entitlements
+
+Use ``License/Entitlement`` to check what features a license grants. Define entitlements as static constants or as a custom enum:
+
+```swift
+// Static constants
+extension License.Entitlement {
+    static let pro: Self = "pro"
+    static let teams: Self = "teams"
+}
+
+// Or a custom enum
+enum AppEntitlement: String, EntitlementProtocol {
+    case pro, teams
+}
+
+// Check entitlements on a valid license
+if case .valid(let license) = licensing.status {
+    let hasPro = license.validate(entitlement: .pro)
+    let hasTeams = license.validate(entitlement: AppEntitlement.teams)
+}
+```
