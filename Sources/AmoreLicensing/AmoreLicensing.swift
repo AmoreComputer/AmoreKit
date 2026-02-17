@@ -5,12 +5,14 @@ import JWTKit
 public final class AmoreLicensing: Licensing {
     public private(set) var status: ValidationStatus = .unknown
     
+    private let autoValidate: Bool
     private let bundleIdentifier: String
     private let configuration: LicensingConfiguration
     private let hardwareIdentifier: HardwareIdentifier
     private let licenseClient: LicenseClient
     private let publicKey: EdDSA.PublicKey
     private let tokenStore: TokenStore
+    private var validationTask: Task<Void, Never>?
     
     public init(
         publicKey: String,
@@ -20,32 +22,38 @@ public final class AmoreLicensing: Licensing {
         server: LicenseServer? = nil,
     ) throws {
         let bid = bundleIdentifier ?? Bundle.main.bundleIdentifier ?? publicKey
+        self.autoValidate = autoValidate
         self.configuration = configuration
         self.publicKey = try EdDSA.PublicKey(x: publicKey, curve: .ed25519)
         self.bundleIdentifier = bid
         self.tokenStore = KeychainTokenStore(bundleIdentifier: bid)
         self.hardwareIdentifier = MacHardwareIdentifier()
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(bundleIdentifier: bid))
-        
         if autoValidate {
-            Task { try? await validate() }
+            Task { [self] in try? await validate() }
         }
     }
     
     internal init(
         publicKey: EdDSA.PublicKey,
         bundleIdentifier: String,
+        autoValidate: Bool = false,
         configuration: LicensingConfiguration = .default,
         tokenStore: TokenStore,
         hardwareIdentifier: HardwareIdentifier,
         licenseClient: LicenseClient
     ) {
+        self.autoValidate = autoValidate
         self.configuration = configuration
         self.publicKey = publicKey
         self.bundleIdentifier = bundleIdentifier
         self.tokenStore = tokenStore
         self.hardwareIdentifier = hardwareIdentifier
         self.licenseClient = licenseClient
+    }
+    
+    isolated deinit {
+        validationTask?.cancel()
     }
     
     public func activate(licenseKey: String) async throws(AmoreError) {
@@ -66,9 +74,11 @@ public final class AmoreLicensing: Licensing {
         let payload = try await verifyToken(token, expectedNonce: nonce)
         do { try tokenStore.store(token) } catch { throw .keychain(error) }
         status = .valid(License(from: payload))
+        if autoValidate { startAutoValidation() }
     }
     
     public func deactivate() async throws(AmoreError) {
+        stopAutoValidation()
         let stored: String?
         do { stored = try tokenStore.retrieve() } catch { throw .keychain(error) }
         guard let token = stored else { throw .noStoredToken }
@@ -96,23 +106,76 @@ public final class AmoreLicensing: Licensing {
         
         let keys = await JWTKeyCollection().add(eddsa: publicKey)
         
+        let result: ValidationStatus
         do {
             let payload = try await keys.verify(token, as: LicensePayload.self)
             guard payload.hardwareId == hardwareIdentifier.identifier else {
                 status = .invalid
                 throw AmoreError.hardwareIdMismatch
             }
-            status = .valid(License(from: payload))
-            return status
+            if shouldRefreshProactively(issuedAt: payload.iat.value) {
+                result = try await refreshOrKeepValid(token, keys: keys, payload: payload)
+            } else {
+                status = .valid(License(from: payload))
+                result = status
+            }
         } catch let error as AmoreError {
             throw error
         } catch {
             // Token expired or invalid signature — try refresh
-            return try await handleExpiredToken(token, keys: keys)
+            result = try await handleExpiredToken(token, keys: keys)
         }
+        
+        if autoValidate, case .valid = result { startAutoValidation() }
+        return result
     }
     
     // MARK: - Private
+    
+    private func startAutoValidation() {
+        guard validationTask == nil else { return }
+        guard let interval = configuration.validationFrequency.timeInterval, interval > 0 else { return }
+        validationTask = Task(name: "AmoreKit.ValidationTask", priority: .background) {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(interval))
+                guard !Task.isCancelled else { return }
+                _ = try? await validate()
+            }
+        }
+    }
+    
+    private func stopAutoValidation() {
+        validationTask?.cancel()
+        validationTask = nil
+    }
+    
+    private func refreshOrKeepValid(
+        _ token: String, keys: JWTKeyCollection, payload: LicensePayload
+    ) async throws(AmoreError) -> ValidationStatus {
+        let nonce = UUID().uuidString
+        do {
+            let newToken = try await licenseClient.validate(token: token, nonce: nonce)
+            let newPayload = try await verifyToken(newToken, expectedNonce: nonce)
+            do { try tokenStore.store(newToken) } catch { throw AmoreError.keychain(error) }
+            status = .valid(License(from: newPayload))
+            return status
+        } catch let error as ClientError {
+            status = .invalid
+            stopAutoValidation()
+            throw .client(error)
+        } catch let error as AmoreError {
+            throw error
+        } catch {
+            // Network failure — JWT is still valid, keep using it
+            status = .valid(License(from: payload))
+            return status
+        }
+    }
+    
+    private func shouldRefreshProactively(issuedAt: Date) -> Bool {
+        guard let interval = configuration.validationFrequency.timeInterval else { return false }
+        return Date().timeIntervalSince(issuedAt) >= interval
+    }
     
     private func applyGracePeriod(token: String, keys: JWTKeyCollection) -> ValidationStatus {
         let parts = token.split(separator: ".")
@@ -154,6 +217,8 @@ public final class AmoreLicensing: Licensing {
             status = .valid(License(from: payload))
             return status
         } catch let error as ClientError {
+            status = .invalid
+            stopAutoValidation()
             throw .client(error)
         } catch let error as AmoreError {
             throw error
