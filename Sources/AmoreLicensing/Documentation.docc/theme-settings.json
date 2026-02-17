@@ -1,0 +1,35 @@
+{
+	"theme": {
+		"aside": {
+			"border-radius": "6px",
+			"border-style": "solid",
+			"border-width": "2px"
+		},
+		"border-radius": "0",
+		"button": {
+			"border-radius": "16px",
+			"border-width": "1px",
+			"border-style": "solid"
+		},
+		"code": {
+			"border-radius": "16px",
+			"border-width": "1px",
+			"border-style": "solid"
+		},
+		"color": {
+			"amore": "#f09000",
+			"documentation-intro-fill": { "dark": "#000", "light": "#fff" },
+			"documentation-intro-accent": "var(--color-jwtkit)",
+			"logo-base": { "dark": "#fff", "light": "#000" },
+			"logo-shape": { "dark": "#000", "light": "#fff" },
+			"link": { "dark": "var(--color-amore)", "light": "var(--color-amore)" },
+			"fill": { "dark": "#222", "light": "#eee" },
+			"button-background": "var(--color-amore)",
+			"fill-blue": "var(--color-amore)",
+			"figure-blue": "var(--color-amore)"
+		},
+		"icons": {
+			"technology": "/images/AmoreLicensing/heart.svg"
+		}
+	}
+}
