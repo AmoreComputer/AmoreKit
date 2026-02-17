@@ -9,7 +9,7 @@ public struct License: Identifiable, Hashable, Codable, Sendable {
 
 extension License {
     
-    init(from payload: LicensePayload) {
+    init(from payload: some LicensePayloadProtocol) {
         self = License(
             id: payload.licenseId,
             name: payload.product,

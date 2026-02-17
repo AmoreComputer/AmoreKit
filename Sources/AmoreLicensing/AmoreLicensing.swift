@@ -9,9 +9,11 @@ public final class AmoreLicensing: Licensing {
     private let bundleIdentifier: String
     private let configuration: LicensingConfiguration
     private let hardwareIdentifier: HardwareIdentifier
+    private let jwtCollection = JWTKeyCollection()
     private let licenseClient: LicenseClient
     private let publicKey: EdDSA.PublicKey
     private let tokenStore: TokenStore
+    private var keysReady = false
     private var validationTask: Task<Void, Never>?
     
     public init(
@@ -104,17 +106,17 @@ public final class AmoreLicensing: Licensing {
             throw .noStoredToken
         }
         
-        let keys = await JWTKeyCollection().add(eddsa: publicKey)
+        await ensureKeysConfigured()
         
         let result: ValidationStatus
         do {
-            let payload = try await keys.verify(token, as: LicensePayload.self)
+            let payload = try await jwtCollection.verify(token, as: LicensePayload.self)
             guard payload.hardwareId == hardwareIdentifier.identifier else {
                 status = .invalid
                 throw AmoreError.hardwareIdMismatch
             }
             if shouldRefreshProactively(issuedAt: payload.iat.value) {
-                result = try await refreshOrKeepValid(token, keys: keys, payload: payload)
+                result = try await refreshOrKeepValid(token, payload: payload)
             } else {
                 status = .valid(License(from: payload))
                 result = status
@@ -123,7 +125,7 @@ public final class AmoreLicensing: Licensing {
             throw error
         } catch {
             // Token expired or invalid signature — try refresh
-            result = try await handleExpiredToken(token, keys: keys)
+            result = try await handleExpiredToken(token)
         }
         
         if autoValidate, case .valid = result { startAutoValidation() }
@@ -150,7 +152,7 @@ public final class AmoreLicensing: Licensing {
     }
     
     private func refreshOrKeepValid(
-        _ token: String, keys: JWTKeyCollection, payload: LicensePayload
+        _ token: String, payload: LicensePayload
     ) async throws(AmoreError) -> ValidationStatus {
         let nonce = UUID().uuidString
         do {
@@ -177,18 +179,8 @@ public final class AmoreLicensing: Licensing {
         return Date().timeIntervalSince(issuedAt) >= interval
     }
     
-    private func applyGracePeriod(token: String, keys: JWTKeyCollection) -> ValidationStatus {
-        let parts = token.split(separator: ".")
-        guard parts.count == 3,
-              let payloadData = Data(base64URLDecoded: String(parts[1]))
-        else {
-            status = .invalid
-            return .invalid
-        }
-        
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .secondsSince1970
-        guard let payload = try? decoder.decode(LicensePayload.self, from: payloadData) else {
+    private func applyGracePeriod(token: String) async -> ValidationStatus {
+        guard let payload = try? await jwtCollection.verify(token, as: GracePeriodPayload.self) else {
             status = .invalid
             return .invalid
         }
@@ -206,7 +198,7 @@ public final class AmoreLicensing: Licensing {
         }
     }
     
-    private func handleExpiredToken(_ token: String, keys: JWTKeyCollection) async throws(AmoreError) -> ValidationStatus {
+    private func handleExpiredToken(_ token: String) async throws(AmoreError) -> ValidationStatus {
         let nonce = UUID().uuidString
         do {
             let newToken = try await licenseClient.validate(
@@ -223,16 +215,16 @@ public final class AmoreLicensing: Licensing {
         } catch let error as AmoreError {
             throw error
         } catch {
-            return applyGracePeriod(token: token, keys: keys)
+            return await applyGracePeriod(token: token)
         }
     }
     
     @discardableResult
     private func verifyToken(_ token: String, expectedNonce: String) async throws(AmoreError) -> LicensePayload {
-        let keys = await JWTKeyCollection().add(eddsa: publicKey)
+        await ensureKeysConfigured()
         let payload: LicensePayload
         do {
-            payload = try await keys.verify(token, as: LicensePayload.self)
+            payload = try await jwtCollection.verify(token, as: LicensePayload.self)
         } catch {
             throw .invalidSignature
         }
@@ -240,14 +232,10 @@ public final class AmoreLicensing: Licensing {
         guard payload.hardwareId == hardwareIdentifier.identifier else { throw .hardwareIdMismatch }
         return payload
     }
-}
-
-private extension Data {
-    init?(base64URLDecoded string: String) {
-        var base64 = string
-            .replacingOccurrences(of: "-", with: "+")
-            .replacingOccurrences(of: "_", with: "/")
-        while base64.count % 4 != 0 { base64.append("=") }
-        self.init(base64Encoded: base64)
+    
+    private func ensureKeysConfigured() async {
+        guard !keysReady else { return }
+        await jwtCollection.add(eddsa: publicKey)
+        keysReady = true
     }
 }

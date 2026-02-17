@@ -1,7 +1,17 @@
 import Foundation
 import JWTKit
 
-struct LicensePayload: JWTPayload {
+protocol LicensePayloadProtocol {
+    var exp: ExpirationClaim { get }
+    var hardwareId: String { get }
+    var iat: IssuedAtClaim { get }
+    var licenseId: UUID { get }
+    var nonce: String { get }
+    var product: String { get }
+    var entitlements: Set<String> { get }
+}
+
+struct LicensePayload: JWTPayload, LicensePayloadProtocol {
     var exp: ExpirationClaim
     var hardwareId: String
     var iat: IssuedAtClaim
@@ -22,5 +32,29 @@ struct LicensePayload: JWTPayload {
     
     func verify(using algorithm: some JWTAlgorithm) throws {
         try exp.verifyNotExpired()
+    }
+}
+
+struct GracePeriodPayload: JWTPayload, LicensePayloadProtocol {
+    var exp: ExpirationClaim
+    var hardwareId: String
+    var iat: IssuedAtClaim
+    var licenseId: UUID
+    var nonce: String
+    var product: String = "Amore"
+    var entitlements: Set<String> = []
+    
+    enum CodingKeys: String, CodingKey {
+        case exp
+        case hardwareId = "hardware_id"
+        case iat
+        case licenseId = "license_id"
+        case nonce
+        case product
+        case entitlements
+    }
+    
+    func verify(using algorithm: some JWTAlgorithm) throws {
+        // Signature verified by JWTKit; expiration intentionally unchecked
     }
 }
