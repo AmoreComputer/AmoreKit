@@ -9,7 +9,7 @@ public struct License: Identifiable, Hashable, Codable, Sendable {
     /// When the license expires, or `nil` if it never expires.
     public var expiresAt: Date?
     /// The set of entitlement keys granted by this license.
-    public var entitlements: Set<String>
+    public var entitlements: Set<Entitlement>
 }
 
 extension License {
@@ -21,15 +21,6 @@ extension License {
             expiresAt: payload.exp.value,
             entitlements: payload.entitlements
         )
-    }
-    
-}
-
-public extension Set where Element == String {
-    
-    /// Returns whether the set contains the given entitlement's raw value.
-    func contains(_ member: LicenseEntitlement) -> Bool {
-        self.contains(member.rawValue)
     }
     
 }

@@ -8,7 +8,7 @@ protocol LicensePayloadProtocol {
     var licenseId: UUID { get }
     var nonce: String { get }
     var product: String { get }
-    var entitlements: Set<String> { get }
+    var entitlements: Set<License.Entitlement> { get }
 }
 
 struct LicensePayload: JWTPayload, LicensePayloadProtocol {
@@ -18,7 +18,7 @@ struct LicensePayload: JWTPayload, LicensePayloadProtocol {
     var licenseId: UUID
     var nonce: String
     var product: String = "Amore"
-    var entitlements: Set<String> = []
+    var entitlements: Set<License.Entitlement> = []
     
     enum CodingKeys: String, CodingKey {
         case exp
@@ -42,7 +42,7 @@ struct GracePeriodPayload: JWTPayload, LicensePayloadProtocol {
     var licenseId: UUID
     var nonce: String
     var product: String = "Amore"
-    var entitlements: Set<String> = []
+    var entitlements: Set<License.Entitlement> = []
     
     enum CodingKeys: String, CodingKey {
         case exp

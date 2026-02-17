@@ -21,6 +21,7 @@ AmoreLicensing provides an `@Observable` class that manages the full license lif
 
 - ``AmoreLicensing``
 - ``License``
+- ``License/Entitlement``
 - ``ValidationStatus``
 
 ### Configuration
@@ -29,7 +30,6 @@ AmoreLicensing provides an `@Observable` class that manages the full license lif
 - ``LicenseServer``
 - ``ValidationFrequency``
 - ``GracePeriod``
-- ``LicenseEntitlement``
 
 ### Errors
 
