@@ -1,0 +1,7 @@
+.build
+.git
+.swiftpm
+Sources
+Tests
+Packages
+DerivedData
