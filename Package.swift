@@ -24,10 +24,6 @@ let package = Package(
                 .product(name: "JWTKit", package: "jwt-kit"),
             ],
         ),
-        .executableTarget(
-            name: "Sandbox",
-            dependencies: ["AmoreLicensing"]
-        ),
         .testTarget(
             name: "AmoreLicensingTests",
             dependencies: [
