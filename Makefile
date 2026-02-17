@@ -11,3 +11,6 @@ docs:
 
 docs-preview:
 	swift package --disable-sandbox preview-documentation --target AmoreLicensing
+
+docs-deploy:
+	make docs && vercel --prod
