@@ -17,6 +17,7 @@ public final class AmoreLicensing: Licensing {
     private let licenseClient: LicenseClient
     private let publicKey: EdDSA.PublicKey
     private let tokenStore: TokenStore
+    private var isValidating = false
     private var keysReady = false
     private var validationTask: Task<Void, Never>?
     
@@ -74,18 +75,11 @@ public final class AmoreLicensing: Licensing {
     /// - Throws: ``AmoreError`` if activation fails.
     public func activate(licenseKey: String) async throws(AmoreError) {
         let nonce = UUID().uuidString
-        let token: String
-        do {
-            token = try await licenseClient.activate(
-                licenseKey: licenseKey, hardwareId: hardwareIdentifier.identifier, nonce: nonce,
+        let token = try await mapClientErrors {
+            try await self.licenseClient.activate(
+                licenseKey: licenseKey, hardwareId: self.hardwareIdentifier.identifier, nonce: nonce,
                 name: Host.current().localizedName
             )
-        } catch let error as ClientError {
-            throw .client(error)
-        } catch let error as AmoreError {
-            throw error
-        } catch {
-            throw .network(NetworkError(message: error.localizedDescription))
         }
         let payload = try await verifyToken(token, expectedNonce: nonce)
         do { try tokenStore.store(token) } catch { throw .keychain(error) }
@@ -100,14 +94,8 @@ public final class AmoreLicensing: Licensing {
         let stored: String?
         do { stored = try tokenStore.retrieve() } catch { throw .keychain(error) }
         guard let token = stored else { throw .noStoredToken }
-        do {
-            try await licenseClient.deactivate(token: token)
-        } catch let error as ClientError {
-            throw .client(error)
-        } catch let error as AmoreError {
-            throw error
-        } catch {
-            throw .network(NetworkError(message: error.localizedDescription))
+        try await mapClientErrors {
+            try await self.licenseClient.deactivate(token: token)
         }
         do { try tokenStore.delete() } catch { throw .keychain(error) }
         status = .unknown
@@ -118,6 +106,10 @@ public final class AmoreLicensing: Licensing {
     /// - Throws: ``AmoreError`` if validation fails.
     @discardableResult
     public func validate() async throws(AmoreError) -> ValidationStatus {
+        guard !isValidating else { return status }
+        isValidating = true
+        defer { isValidating = false }
+        
         let stored: String?
         do { stored = try tokenStore.retrieve() } catch { throw .keychain(error) }
         guard let token = stored else {
@@ -135,7 +127,7 @@ public final class AmoreLicensing: Licensing {
                 throw AmoreError.hardwareIdMismatch
             }
             if shouldRefreshProactively(issuedAt: payload.iat.value) {
-                result = try await refreshOrKeepValid(token, payload: payload)
+                result = try await refreshToken(token, currentPayload: payload)
             } else {
                 status = .valid(License(from: payload))
                 result = status
@@ -144,7 +136,7 @@ public final class AmoreLicensing: Licensing {
             throw error
         } catch {
             // Token expired or invalid signature — try refresh
-            result = try await handleExpiredToken(token)
+            result = try await refreshToken(token)
         }
         
         if autoValidate, case .valid = result { startAutoValidation() }
@@ -170,15 +162,16 @@ public final class AmoreLicensing: Licensing {
         validationTask = nil
     }
     
-    private func refreshOrKeepValid(
-        _ token: String, payload: LicensePayload
+    private func refreshToken(
+        _ token: String,
+        currentPayload: LicensePayload? = nil
     ) async throws(AmoreError) -> ValidationStatus {
         let nonce = UUID().uuidString
         do {
             let newToken = try await licenseClient.validate(token: token, nonce: nonce)
-            let newPayload = try await verifyToken(newToken, expectedNonce: nonce)
+            let payload = try await verifyToken(newToken, expectedNonce: nonce)
             do { try tokenStore.store(newToken) } catch { throw AmoreError.keychain(error) }
-            status = .valid(License(from: newPayload))
+            status = .valid(License(from: payload))
             return status
         } catch let error as ClientError {
             status = .invalid
@@ -187,9 +180,12 @@ public final class AmoreLicensing: Licensing {
         } catch let error as AmoreError {
             throw error
         } catch {
-            // Network failure — JWT is still valid, keep using it
-            status = .valid(License(from: payload))
-            return status
+            if let currentPayload {
+                // Token still valid locally, keep using it
+                status = .valid(License(from: currentPayload))
+                return status
+            }
+            return await applyGracePeriod(token: token)
         }
     }
     
@@ -199,6 +195,7 @@ public final class AmoreLicensing: Licensing {
     }
     
     private func applyGracePeriod(token: String) async -> ValidationStatus {
+        await ensureKeysConfigured()
         guard let payload = try? await jwtCollection.verify(token, as: GracePeriodPayload.self) else {
             status = .invalid
             return .invalid
@@ -217,24 +214,17 @@ public final class AmoreLicensing: Licensing {
         }
     }
     
-    private func handleExpiredToken(_ token: String) async throws(AmoreError) -> ValidationStatus {
-        let nonce = UUID().uuidString
+    private func mapClientErrors<T>(
+        _ operation: @MainActor @Sendable () async throws -> T
+    ) async throws(AmoreError) -> T {
         do {
-            let newToken = try await licenseClient.validate(
-                token: token, nonce: nonce
-            )
-            let payload = try await verifyToken(newToken, expectedNonce: nonce)
-            do { try tokenStore.store(newToken) } catch { throw AmoreError.keychain(error) }
-            status = .valid(License(from: payload))
-            return status
+            return try await operation()
         } catch let error as ClientError {
-            status = .invalid
-            stopAutoValidation()
             throw .client(error)
         } catch let error as AmoreError {
             throw error
         } catch {
-            return await applyGracePeriod(token: token)
+            throw .network(NetworkError(message: error.localizedDescription))
         }
     }
     
