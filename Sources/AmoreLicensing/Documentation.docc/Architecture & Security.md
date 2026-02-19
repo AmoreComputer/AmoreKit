@@ -42,7 +42,7 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
    - Hardware ID matches current device
 4. If valid: app runs normally
 5. If expired: attempt refresh from server
-6. If refresh fails: enter grace period (7 days default)
+6. If refresh fails: enter grace period (7 days default). ``LicensingConfiguration/gracePeriod``
 7. After grace period: block or degrade features
 
 ### Refresh Flow (when JWT expires)
@@ -78,5 +78,5 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
 ### Grace Period
 - App continues working N days after last successful validation
 - Handles temporary network outages or server downtime
-- Configurable per-app (default: 7 days)
+- Configurable per-app (default: 7 days). ``LicensingConfiguration/gracePeriod``
 - Stored: last validation timestamp from JWT

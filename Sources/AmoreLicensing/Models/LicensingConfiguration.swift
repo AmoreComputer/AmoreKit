@@ -1,7 +1,9 @@
 /// Configuration for license validation behavior.
 public struct LicensingConfiguration: Sendable {
-    var gracePeriod: GracePeriod
-    var validationFrequency: ValidationFrequency
+    /// How long to allow usage after token expiry. Defaults to 7 days.
+    public var gracePeriod: GracePeriod
+    /// How often to re-validate with the server. Defaults to weekly.
+    public var validationFrequency: ValidationFrequency
     
     /// Creates a licensing configuration.
     /// - Parameters:
