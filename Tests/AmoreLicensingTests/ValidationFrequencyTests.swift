@@ -33,7 +33,6 @@ import Testing
     
     private func makeClient(
         publicKey: EdDSA.PublicKey,
-        autoValidate: Bool = false,
         configuration: LicensingConfiguration,
         tokenStore: MockTokenStore = MockTokenStore(),
         licenseClient: MockLicenseClient = MockLicenseClient()
@@ -41,7 +40,6 @@ import Testing
         let client = AmoreLicensing(
             publicKey: publicKey,
             bundleIdentifier: bundleId,
-            autoValidate: autoValidate,
             configuration: configuration,
             tokenStore: tokenStore,
             hardwareIdentifier: MockHardwareIdentifier(identifier: hardwareId),
@@ -252,7 +250,6 @@ import Testing
         let config = LicensingConfiguration(validationFrequency: .seconds(0.05))
         let (client, _, _) = makeClient(
             publicKey: publicKey,
-            autoValidate: true,
             configuration: config,
             licenseClient: mock
         )
@@ -288,7 +285,6 @@ import Testing
         let config = LicensingConfiguration(validationFrequency: .seconds(0.05))
         let (client, _, _) = makeClient(
             publicKey: publicKey,
-            autoValidate: true,
             configuration: config,
             tokenStore: store,
             licenseClient: mock
@@ -321,7 +317,6 @@ import Testing
         let config = LicensingConfiguration(validationFrequency: .afterExpiration)
         let (client, _, _) = makeClient(
             publicKey: publicKey,
-            autoValidate: true,
             configuration: config,
             tokenStore: store,
             licenseClient: mock
@@ -357,7 +352,6 @@ import Testing
         let config = LicensingConfiguration(validationFrequency: .seconds(0.05))
         let (client, _, _) = makeClient(
             publicKey: publicKey,
-            autoValidate: true,
             configuration: config,
             tokenStore: store,
             licenseClient: mock
@@ -373,6 +367,37 @@ import Testing
         let countAfterRejection = validateCallCount
         try await Task.sleep(for: .seconds(0.2))
         #expect(validateCallCount == countAfterRejection)
+    }
+    
+    @Test func manualFrequencyDoesNotAutoValidate() async throws {
+        let (privateKey, publicKey) = try makeKeys()
+        let store = MockTokenStore()
+        let token = try await signToken(privateKey: privateKey, nonce: "stored")
+        try store.store(token)
+        
+        let mock = MockLicenseClient()
+        var callCount = 0
+        mock.onValidate = { _, _ in
+            callCount += 1
+            throw URLError(.notConnectedToInternet)
+        }
+        
+        let config = LicensingConfiguration(validationFrequency: .manual)
+        let (client, _, _) = makeClient(
+            publicKey: publicKey,
+            configuration: config,
+            tokenStore: store,
+            licenseClient: mock
+        )
+        
+        try await client.validate()
+        try await Task.sleep(for: .seconds(0.2))
+        
+        guard case .valid = client.status else {
+            Issue.record("Expected valid, got \(client.status)")
+            return
+        }
+        #expect(callCount == 0)
     }
     
     @Test func autoValidateStopsOnDeactivation() async throws {
@@ -392,7 +417,6 @@ import Testing
         let config = LicensingConfiguration(validationFrequency: .seconds(0.05))
         let (client, _, _) = makeClient(
             publicKey: publicKey,
-            autoValidate: true,
             configuration: config,
             licenseClient: mock
         )

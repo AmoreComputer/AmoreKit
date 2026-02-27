@@ -9,7 +9,6 @@ public final class AmoreLicensing: Licensing {
     /// The current validation status of the license.
     public private(set) var status: ValidationStatus = .unknown
     
-    private let autoValidate: Bool
     private let bundleIdentifier: String
     private let configuration: LicensingConfiguration
     private let hardwareIdentifier: HardwareIdentifier
@@ -17,6 +16,9 @@ public final class AmoreLicensing: Licensing {
     private let licenseClient: LicenseClient
     private let publicKey: EdDSA.PublicKey
     private let tokenStore: TokenStore
+    private var shouldAutoValidate: Bool {
+        configuration.validationFrequency != .manual
+    }
     private var isValidating = false
     private var keysReady = false
     private var validationTask: Task<Void, Never>?
@@ -25,25 +27,22 @@ public final class AmoreLicensing: Licensing {
     /// - Parameters:
     ///   - publicKey: The Ed25519 public key used to verify server responses.
     ///   - bundleIdentifier: The app's bundle identifier. Defaults to `Bundle.main.bundleIdentifier`.
-    ///   - autoValidate: Whether to validate the license automatically on init and periodically. Defaults to `false`.
     ///   - configuration: The licensing configuration. Defaults to ``LicensingConfiguration/default``.
     ///   - server: The license server to use. Defaults to the Amore server.
     public init(
         publicKey: String,
         bundleIdentifier: String? = nil,
-        autoValidate: Bool = false,
         configuration: LicensingConfiguration = .default,
         server: LicenseServer? = nil,
     ) throws {
         let bid = bundleIdentifier ?? Bundle.main.bundleIdentifier ?? publicKey
-        self.autoValidate = autoValidate
         self.configuration = configuration
         self.publicKey = try EdDSA.PublicKey(x: publicKey, curve: .ed25519)
         self.bundleIdentifier = bid
         self.tokenStore = KeychainTokenStore(bundleIdentifier: bid)
         self.hardwareIdentifier = MacHardwareIdentifier()
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(bundleIdentifier: bid))
-        if autoValidate {
+        if shouldAutoValidate {
             Task { [self] in try? await validate() }
         }
     }
@@ -51,13 +50,11 @@ public final class AmoreLicensing: Licensing {
     internal init(
         publicKey: EdDSA.PublicKey,
         bundleIdentifier: String,
-        autoValidate: Bool = false,
         configuration: LicensingConfiguration = .default,
         tokenStore: TokenStore,
         hardwareIdentifier: HardwareIdentifier,
         licenseClient: LicenseClient
     ) {
-        self.autoValidate = autoValidate
         self.configuration = configuration
         self.publicKey = publicKey
         self.bundleIdentifier = bundleIdentifier
@@ -84,7 +81,7 @@ public final class AmoreLicensing: Licensing {
         let payload = try await verifyToken(token, expectedNonce: nonce)
         do { try tokenStore.store(token) } catch { throw .keychain(error) }
         status = .valid(License(from: payload))
-        if autoValidate { startAutoValidation() }
+        if shouldAutoValidate { startAutoValidation() }
     }
     
     /// Deactivates the current license on this device.
@@ -139,7 +136,7 @@ public final class AmoreLicensing: Licensing {
             result = try await refreshToken(token)
         }
         
-        if autoValidate, case .valid = result { startAutoValidation() }
+        if shouldAutoValidate, case .valid = result { startAutoValidation() }
         return result
     }
     
@@ -178,6 +175,10 @@ public final class AmoreLicensing: Licensing {
             stopAutoValidation()
             throw .client(error)
         } catch let error as AmoreError {
+            if let currentPayload {
+                status = .valid(License(from: currentPayload))
+                return status
+            }
             throw error
         } catch {
             if let currentPayload {

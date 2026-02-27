@@ -9,7 +9,6 @@ To get started with AmoreLicensing, create an instance of ``AmoreLicensing`` wit
 ```swift
 let licensing = try AmoreLicensing(
     publicKey: "sa92JNtsaYefYp0MIWQbKu1hpS9bSN89ta7b8mlPbI8=",
-    autoValidate: true,
 )
 ```
 
