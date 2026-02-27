@@ -36,5 +36,5 @@ AmoreLicensing provides an `@Observable` class that manages the full license lif
 
 - ``AmoreError``
 - ``ClientError``
-- ``KeychainError``
+- ``TokenStoreError``
 - ``NetworkError``

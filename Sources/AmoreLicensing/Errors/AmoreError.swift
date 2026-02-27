@@ -8,8 +8,8 @@ public enum AmoreError: LocalizedError, Equatable, Sendable {
     case hardwareIdMismatch
     /// The server response has an invalid cryptographic signature.
     case invalidSignature
-    /// A keychain operation failed.
-    case keychain(KeychainError)
+    /// A token store operation failed.
+    case tokenStore(TokenStoreError)
     /// A network request failed.
     case network(NetworkError)
     /// The server response failed nonce verification.
@@ -25,7 +25,7 @@ public enum AmoreError: LocalizedError, Equatable, Sendable {
             return "This license is registered to a different device."
         case .invalidSignature:
             return "The server response has an invalid signature."
-        case .keychain(let error):
+        case .tokenStore(let error):
             return error.localizedDescription
         case .network(let error):
             return error.message

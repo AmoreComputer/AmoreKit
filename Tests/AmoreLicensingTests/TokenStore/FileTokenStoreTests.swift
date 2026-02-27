@@ -1,12 +1,21 @@
+import Foundation
 import Testing
 
 @testable import AmoreLicensing
 
-@Suite(.serialized) struct KeychainTokenStoreTests {
-    private let store = KeychainTokenStore(bundleIdentifier: "computer.amore.test.amorekit.keychain")
+@Suite(.serialized) final class FileTokenStoreTests {
+    private let store: FileTokenStore
+    private let tempDir: URL
 
     init() throws {
+        tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        store = FileTokenStore(directory: tempDir)
         try? store.delete()
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: tempDir)
     }
 
     @Test func storeAndRetrieve() throws {

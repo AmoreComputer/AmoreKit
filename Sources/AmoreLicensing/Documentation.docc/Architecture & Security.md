@@ -30,12 +30,12 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
    - JWT signature valid (using server's public key)
    - Nonce matches what client sent
    - JWT not expired
-1. Client stores JWT in macOS Keychain
+1. Client stores JWT in macOS file system
 
 ### Ongoing Validation (offline-first)
 
 1. App launches
-2. Client loads JWT from Keychain
+2. Client loads JWT from file system
 3. Client verifies locally:
    - Signature valid
    - Not expired

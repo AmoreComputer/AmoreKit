@@ -39,7 +39,7 @@ public final class AmoreLicensing: Licensing {
         self.configuration = configuration
         self.publicKey = try EdDSA.PublicKey(x: publicKey, curve: .ed25519)
         self.bundleIdentifier = bid
-        self.tokenStore = KeychainTokenStore(bundleIdentifier: bid)
+        self.tokenStore = FileTokenStore(bundleIdentifier: bid)
         self.hardwareIdentifier = MacHardwareIdentifier()
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(bundleIdentifier: bid))
         if shouldAutoValidate {
@@ -79,7 +79,7 @@ public final class AmoreLicensing: Licensing {
             )
         }
         let payload = try await verifyToken(token, expectedNonce: nonce)
-        do { try tokenStore.store(token) } catch { throw .keychain(error) }
+        do { try tokenStore.store(token) } catch { throw .tokenStore(error) }
         status = .valid(License(from: payload))
         if shouldAutoValidate { startAutoValidation() }
     }
@@ -89,12 +89,12 @@ public final class AmoreLicensing: Licensing {
     public func deactivate() async throws(AmoreError) {
         stopAutoValidation()
         let stored: String?
-        do { stored = try tokenStore.retrieve() } catch { throw .keychain(error) }
+        do { stored = try tokenStore.retrieve() } catch { throw .tokenStore(error) }
         guard let token = stored else { throw .noStoredToken }
         try await mapClientErrors {
             try await self.licenseClient.deactivate(token: token)
         }
-        do { try tokenStore.delete() } catch { throw .keychain(error) }
+        do { try tokenStore.delete() } catch { throw .tokenStore(error) }
         status = .unknown
     }
     
@@ -108,7 +108,7 @@ public final class AmoreLicensing: Licensing {
         defer { isValidating = false }
         
         let stored: String?
-        do { stored = try tokenStore.retrieve() } catch { throw .keychain(error) }
+        do { stored = try tokenStore.retrieve() } catch { throw .tokenStore(error) }
         guard let token = stored else {
             status = .unknown
             throw .noStoredToken
@@ -167,7 +167,7 @@ public final class AmoreLicensing: Licensing {
         do {
             let newToken = try await licenseClient.validate(token: token, nonce: nonce)
             let payload = try await verifyToken(newToken, expectedNonce: nonce)
-            do { try tokenStore.store(newToken) } catch { throw AmoreError.keychain(error) }
+            do { try tokenStore.store(newToken) } catch { throw AmoreError.tokenStore(error) }
             status = .valid(License(from: payload))
             return status
         } catch let error as ClientError {
