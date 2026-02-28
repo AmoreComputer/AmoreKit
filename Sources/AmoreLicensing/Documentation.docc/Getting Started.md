@@ -2,6 +2,20 @@
 
 This article describes how to get started with AmoreLicensing.
 
+## Installation
+
+In Xcode, go to **File → Add Package Dependencies…** and enter:
+
+```
+https://github.com/AmoreComputer/AmoreKit
+```
+
+Or add it to your `Package.swift`:
+
+```swift
+.package(url: "https://github.com/AmoreComputer/AmoreKit", from: "0.1")
+```
+
 ## AmoreLicensing
 
 To get started with AmoreLicensing, create an instance of ``AmoreLicensing`` with your public licensing key.
