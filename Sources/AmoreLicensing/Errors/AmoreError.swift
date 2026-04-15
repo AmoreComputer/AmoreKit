@@ -28,7 +28,7 @@ public enum AmoreError: LocalizedError, Equatable, Sendable {
         case .tokenStore(let error):
             return error.localizedDescription
         case .network(let error):
-            return error.message
+            return error.localizedDescription
         case .nonceMismatch:
             return "The server response failed nonce verification."
         case .noStoredToken:

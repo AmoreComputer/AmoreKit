@@ -222,10 +222,12 @@ public final class AmoreLicensing: Licensing {
             return try await operation()
         } catch let error as ClientError {
             throw .client(error)
+        } catch let error as NetworkError {
+            throw .network(error)
         } catch let error as AmoreError {
             throw error
         } catch {
-            throw .network(NetworkError(message: error.localizedDescription))
+            throw .network(.requestFailed(error.localizedDescription))
         }
     }
     

@@ -25,7 +25,7 @@ struct HTTPLicenseClient: LicenseClient {
     private func post<T: Encodable>(path: String, body: T) async throws -> String {
         let (data, response) = try await send(path: path, body: body)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw serverError(from: data)
+            throw serverError(from: data, response: response)
         }
         return try JSONDecoder().decode(TokenResponse.self, from: data).token
     }
@@ -33,18 +33,21 @@ struct HTTPLicenseClient: LicenseClient {
     private func postVoid<T: Encodable>(path: String, body: T) async throws {
         let (data, response) = try await send(path: path, body: body)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw serverError(from: data)
+            throw serverError(from: data, response: response)
         }
     }
-    
-    private func serverError(from data: Data) -> any Error {
+
+    private func serverError(from data: Data, response: URLResponse) -> any Error {
+        if let http = response as? HTTPURLResponse, http.statusCode == 429 {
+            return NetworkError.rateLimited
+        }
         guard let body = try? JSONDecoder().decode(ErrorResponse.self, from: data) else {
-            return NetworkError(message: "An unknown error occurred")
+            return NetworkError.requestFailed("An unknown error occurred")
         }
         if let clientError = ClientError(rawValue: body.error) {
             return clientError
         }
-        return NetworkError(message: body.message)
+        return NetworkError.requestFailed(body.message)
     }
     
     private func send<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {

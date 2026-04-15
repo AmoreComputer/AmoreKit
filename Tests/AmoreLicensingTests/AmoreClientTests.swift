@@ -76,6 +76,17 @@ import Testing
         }
     }
 
+    @Test func activationRateLimited() async throws {
+        let (_, publicKey) = try makeKeys()
+        let mock = MockLicenseClient()
+        mock.onActivate = { _, _, _ in throw NetworkError.rateLimited }
+        let (client, _, _) = makeClient(publicKey: publicKey, licenseClient: mock)
+        
+        await #expect(throws: AmoreError.network(.rateLimited)) {
+            try await client.activate(licenseKey: "KEY")
+        }
+    }
+
     @Test func activationNetworkFailure() async throws {
         let (_, publicKey) = try makeKeys()
         let mock = MockLicenseClient()
