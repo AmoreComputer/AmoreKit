@@ -35,13 +35,13 @@ public final class AmoreLicensing: Licensing {
         configuration: LicensingConfiguration = .default,
         server: LicenseServer? = nil,
     ) throws {
-        let bid = bundleIdentifier ?? Bundle.main.bundleIdentifier ?? publicKey
+        let bundleIdentifier = bundleIdentifier ?? Bundle.main.bundleIdentifier ?? publicKey
         self.configuration = configuration
         self.publicKey = try EdDSA.PublicKey(x: publicKey, curve: .ed25519)
-        self.bundleIdentifier = bid
-        self.tokenStore = FileTokenStore(bundleIdentifier: bid)
+        self.bundleIdentifier = bundleIdentifier
+        self.tokenStore = FileTokenStore(bundleIdentifier: bundleIdentifier)
         self.hardwareIdentifier = MacHardwareIdentifier()
-        self.licenseClient = HTTPLicenseClient(server: server ?? .amore(bundleIdentifier: bid))
+        self.licenseClient = HTTPLicenseClient(server: server ?? .amore(for: bundleIdentifier))
         if shouldAutoValidate {
             Task { [self] in try? await validate() }
         }

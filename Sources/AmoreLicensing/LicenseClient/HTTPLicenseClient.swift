@@ -9,29 +9,29 @@ struct HTTPLicenseClient: LicenseClient {
     
     func activate(licenseKey: String, hardwareId: String, nonce: String, name: String?) async throws -> String {
         let body = ActivateRequest(licenseKey: licenseKey, hardwareId: hardwareId, nonce: nonce, name: name)
-        return try await post(path: server.activatePath, body: body)
+        return try await post(body, to: server.activateURL)
     }
     
     func deactivate(token: String) async throws {
         let body = DeactivateRequest(token: token)
-        try await postVoid(path: server.deactivatePath, body: body)
+        try await postVoid(body, to: server.deactivateURL)
     }
     
     func validate(token: String, nonce: String) async throws -> String {
         let body = ValidateRequest(token: token, nonce: nonce)
-        return try await post(path: server.validatePath, body: body)
+        return try await post(body, to: server.validateURL)
     }
     
-    private func post<T: Encodable>(path: String, body: T) async throws -> String {
-        let (data, response) = try await send(path: path, body: body)
+    private func post<T: Encodable>(_ body: T, to url: URL) async throws -> String {
+        let (data, response) = try await send(body, to: url)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw serverError(from: data, response: response)
         }
         return try JSONDecoder().decode(TokenResponse.self, from: data).token
     }
     
-    private func postVoid<T: Encodable>(path: String, body: T) async throws {
-        let (data, response) = try await send(path: path, body: body)
+    private func postVoid<T: Encodable>(_ body: T, to url: URL) async throws {
+        let (data, response) = try await send(body, to: url)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw serverError(from: data, response: response)
         }
@@ -50,8 +50,8 @@ struct HTTPLicenseClient: LicenseClient {
         return NetworkError.requestFailed(body.message)
     }
     
-    private func send<T: Encodable>(path: String, body: T) async throws -> (Data, URLResponse) {
-        var request = URLRequest(url: server.url.appendingPathComponent(path))
+    private func send<T: Encodable>(_ body: T, to url: URL) async throws -> (Data, URLResponse) {
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(body)
