@@ -39,7 +39,21 @@ public final class AmoreLicensing: Licensing {
         self.configuration = configuration
         self.publicKey = try EdDSA.PublicKey(x: publicKey, curve: .ed25519)
         self.bundleIdentifier = bundleIdentifier
-        self.tokenStore = FileTokenStore(bundleIdentifier: bundleIdentifier)
+
+        switch configuration.tokenStoreLocation {
+        case .appGroup(let appGroupIdentifier):
+            self.tokenStore = FileTokenStore(appGroupIdentifier: appGroupIdentifier)
+
+        case .defaultLocation:
+            self.tokenStore = FileTokenStore(bundleIdentifier: bundleIdentifier)
+
+        case .directory(let url):
+            self.tokenStore = FileTokenStore(directory: url)
+
+        case .keychainAccessGroup(let accessGroup):
+            self.tokenStore = KeychainTokenStore(bundleIdentifier: bundleIdentifier, accessGroup: accessGroup)
+        }
+
         self.hardwareIdentifier = MacHardwareIdentifier()
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(for: bundleIdentifier))
         if shouldAutoValidate {

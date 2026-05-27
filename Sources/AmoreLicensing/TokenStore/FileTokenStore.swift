@@ -9,7 +9,12 @@ struct FileTokenStore: TokenStore {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         self.fileURL = appSupport.appendingPathComponent(bundleIdentifier).appendingPathComponent(Self.fileName)
     }
-    
+
+    init(appGroupIdentifier: String) {
+        let appGroupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)!
+        self.fileURL = appGroupURL.appendingPathComponent(Self.fileName)
+    }
+
     init(directory: URL) {
         self.fileURL = directory.appendingPathComponent(Self.fileName)
     }
