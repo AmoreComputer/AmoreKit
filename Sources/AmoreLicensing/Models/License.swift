@@ -10,6 +10,9 @@ public struct License: Identifiable, Hashable, Codable, Sendable {
     public var expiresAt: Date?
     /// The set of entitlement keys granted by this license.
     public var entitlements: Set<Entitlement>
+    /// Subscription state if this license is subscription-backed,
+    /// or `nil` for perpetual / one-time-purchase licenses.
+    public var subscriptionState: SubscriptionState?
 }
 
 extension License {
@@ -19,7 +22,8 @@ extension License {
             id: payload.licenseId,
             name: payload.product,
             expiresAt: payload.exp.value,
-            entitlements: payload.entitlements
+            entitlements: payload.entitlements,
+            subscriptionState: payload.subscriptionState
         )
     }
     

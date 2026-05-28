@@ -9,6 +9,7 @@ protocol LicensePayloadProtocol {
     var nonce: String { get }
     var product: String { get }
     var entitlements: Set<License.Entitlement> { get }
+    var subscriptionState: SubscriptionState? { get }
 }
 
 struct LicensePayload: JWTPayload, LicensePayloadProtocol {
@@ -19,6 +20,7 @@ struct LicensePayload: JWTPayload, LicensePayloadProtocol {
     var nonce: String
     var product: String = "Amore"
     var entitlements: Set<License.Entitlement> = []
+    var subscriptionState: SubscriptionState?
     
     enum CodingKeys: String, CodingKey {
         case exp
@@ -28,6 +30,7 @@ struct LicensePayload: JWTPayload, LicensePayloadProtocol {
         case nonce
         case product
         case entitlements
+        case subscriptionState = "subscription_state"
     }
     
     func verify(using algorithm: some JWTAlgorithm) throws {
@@ -43,6 +46,7 @@ struct GracePeriodPayload: JWTPayload, LicensePayloadProtocol {
     var nonce: String
     var product: String = "Amore"
     var entitlements: Set<License.Entitlement> = []
+    var subscriptionState: SubscriptionState?
     
     enum CodingKeys: String, CodingKey {
         case exp
@@ -52,6 +56,7 @@ struct GracePeriodPayload: JWTPayload, LicensePayloadProtocol {
         case nonce
         case product
         case entitlements
+        case subscriptionState = "subscription_state"
     }
     
     func verify(using algorithm: some JWTAlgorithm) throws {
