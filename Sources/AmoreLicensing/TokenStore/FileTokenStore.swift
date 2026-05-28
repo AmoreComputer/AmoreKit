@@ -1,6 +1,10 @@
 import Foundation
 
-struct FileTokenStore: TokenStore {
+/// A ``TokenStore`` that persists the license token as a file on disk.
+///
+/// This is the default store used by ``AmoreLicensing`` when no custom store is provided. It writes
+/// to the app's Application Support directory.
+public struct FileTokenStore: TokenStore {
     private let fileURL: URL
     
     static let fileName = "license.jwt"
@@ -10,11 +14,13 @@ struct FileTokenStore: TokenStore {
         self.fileURL = appSupport.appendingPathComponent(bundleIdentifier).appendingPathComponent(Self.fileName)
     }
     
-    init(directory: URL) {
+    /// Creates a store that persists the token in the given directory.
+    /// - Parameter directory: The directory in which to read and write the token file.
+    public init(directory: URL) {
         self.fileURL = directory.appendingPathComponent(Self.fileName)
     }
     
-    func store(_ token: String) throws(TokenStoreError) {
+    public func store(_ token: String) throws(TokenStoreError) {
         let directory = fileURL.deletingLastPathComponent()
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -24,7 +30,7 @@ struct FileTokenStore: TokenStore {
         }
     }
     
-    func retrieve() throws(TokenStoreError) -> String? {
+    public func retrieve() throws(TokenStoreError) -> String? {
         guard FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false)) else { return nil }
         do {
             let data = try Data(contentsOf: fileURL)
@@ -34,7 +40,7 @@ struct FileTokenStore: TokenStore {
         }
     }
     
-    func delete() throws(TokenStoreError) {
+    public func delete() throws(TokenStoreError) {
         guard FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false)) else { return }
         do {
             try FileManager.default.removeItem(at: fileURL)
