@@ -16,13 +16,19 @@ public struct AmoreStore: Sendable {
     private let bundleIdentifier: String
     private let productsClient: ProductsClient
 
-    /// Creates a store client for the given bundle identifier.
+    /// Creates a store client for the given bundle identifier, targeting the Amore server.
+    /// - Parameter bundleIdentifier: The app's bundle identifier. Defaults to `Bundle.main.bundleIdentifier`.
+    public init(bundleIdentifier: String? = nil) {
+        self.init(bundleIdentifier: bundleIdentifier, baseURL: .amoreServer)
+    }
+    
+    /// Creates a store client for the given bundle identifier and server URL.
     /// - Parameters:
     ///   - bundleIdentifier: The app's bundle identifier. Defaults to `Bundle.main.bundleIdentifier`.
-    ///   - baseURL: The licensing server base URL. Defaults to the Amore server when `nil`.
-    public init(bundleIdentifier: String? = nil, baseURL: URL? = nil) {
+    ///   - baseURL: The licensing server base URL.
+    public init(bundleIdentifier: String? = nil, baseURL: URL) {
         self.bundleIdentifier = bundleIdentifier ?? Bundle.main.bundleIdentifier ?? ""
-        self.productsClient = HTTPProductsClient(baseURL: baseURL ?? .amoreServer)
+        self.productsClient = HTTPProductsClient(baseURL: baseURL)
     }
 
     init(bundleIdentifier: String, productsClient: ProductsClient) {
