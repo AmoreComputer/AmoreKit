@@ -2,13 +2,13 @@
 public struct LicensingConfiguration: Sendable {
     /// How long to allow usage after token expiry. Defaults to 7 days.
     public var gracePeriod: GracePeriod
-    /// How often to re-validate with the server. Defaults to weekly.
+    /// How stale a cached license may become before ``AmoreLicensing/validate()`` refreshes it. Defaults to weekly.
     public var validationFrequency: ValidationFrequency
     
     /// Creates a licensing configuration.
     /// - Parameters:
     ///   - gracePeriod: How long to allow usage after token expiry. Defaults to 7 days.
-    ///   - validationFrequency: How often to re-validate with the server. Defaults to weekly.
+    ///   - validationFrequency: How stale a cached license may become before ``AmoreLicensing/validate()`` refreshes it. Defaults to weekly.
     public init(
         gracePeriod: GracePeriod = .days(7),
         validationFrequency: ValidationFrequency = .weekly

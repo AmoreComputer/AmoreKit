@@ -34,9 +34,16 @@ To activate your user's license, call ``AmoreLicensing/activate(licenseKey:)`` w
 
 ## Validation
 
-You can either manually call ``AmoreLicensing``s ``AmoreLicensing/validate()`` or observe ``AmoreLicensing/status`` to get notified about the licensing status changes.
+``AmoreLicensing`` validates the stored license once at launch and then whenever you call ``AmoreLicensing/validate()``. There is no background timer: ``ValidationFrequency`` is the staleness threshold that decides whether a ``AmoreLicensing/validate()`` call refreshes from the server or just verifies the cached token locally. Drive revalidation from your app's lifecycle to keep a long-running app fresh:
 
-``AmoreLicensing`` is `@Observable` and plays nicely with the Observation framework and SwiftUI.
+```swift
+.onChange(of: scenePhase) { _, phase in
+    if phase == .active { Task { try? await licensing.validate() } }
+}
+```
+
+
+``AmoreLicensing`` is `@Observable` and plays nicely with the Observation framework and SwiftUI.
 
 ```swift
 // Validate manually

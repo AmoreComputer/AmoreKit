@@ -54,12 +54,18 @@ let licensing = try AmoreLicensing(
     publicKey: "your-key",
     configuration: LicensingConfiguration(
         gracePeriod: .days(7),            // How long to allow usage after token expiry
-        validationFrequency: .weekly      // How often to re-validate with the server
+        validationFrequency: .weekly      // Staleness threshold before validate() refreshes from the server
     )
 )
 ```
 
-When using `ValidationFrequency.manual`, call `licensing.validate()` yourself. All other frequencies trigger automatic background validation.
+AmoreLicensing validates once at launch (for every frequency except `.manual`). It does **not** run a background timer: `ValidationFrequency` is the staleness threshold that decides whether a `validate()` call refreshes from the server or just verifies the cached token locally. To keep a long-running app fresh, call `licensing.validate()` from your own lifecycle, e.g. when the window comes to the foreground:
+
+```swift
+.onChange(of: scenePhase) { _, phase in
+    if phase == .active { Task { try? await licensing.validate() } }
+}
+```
 
 ## Entitlements
 

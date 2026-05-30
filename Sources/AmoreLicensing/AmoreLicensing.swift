@@ -16,12 +16,8 @@ public final class AmoreLicensing: Licensing {
     private let licenseClient: LicenseClient
     private let publicKey: EdDSA.PublicKey
     private let tokenStore: TokenStore
-    private var shouldAutoValidate: Bool {
-        configuration.validationFrequency != .manual
-    }
     private var isValidating = false
     private var keysReady = false
-    private var validationTask: Task<Void, Never>?
     
     /// Creates a new licensing instance.
     /// - Parameters:
@@ -42,7 +38,7 @@ public final class AmoreLicensing: Licensing {
         self.tokenStore = FileTokenStore(bundleIdentifier: bundleIdentifier)
         self.hardwareIdentifier = MacHardwareIdentifier()
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(for: bundleIdentifier))
-        if shouldAutoValidate {
+        if configuration.validationFrequency.shouldValidateAtLaunch {
             Task { [self] in try? await validate() }
         }
     }
@@ -63,10 +59,6 @@ public final class AmoreLicensing: Licensing {
         self.licenseClient = licenseClient
     }
     
-    isolated deinit {
-        validationTask?.cancel()
-    }
-    
     /// Activates a license on this device using the given license key.
     /// - Parameter licenseKey: The license key to activate.
     /// - Throws: ``AmoreError`` if activation fails.
@@ -81,13 +73,11 @@ public final class AmoreLicensing: Licensing {
         let payload = try await verifyToken(token, expectedNonce: nonce)
         do { try tokenStore.store(token) } catch { throw .tokenStore(error) }
         status = .valid(License(from: payload))
-        if shouldAutoValidate { startAutoValidation() }
     }
     
     /// Deactivates the current license on this device.
     /// - Throws: ``AmoreError`` if deactivation fails.
     public func deactivate() async throws(AmoreError) {
-        stopAutoValidation()
         let stored: String?
         do { stored = try tokenStore.retrieve() } catch { throw .tokenStore(error) }
         guard let token = stored else { throw .noStoredToken }
@@ -99,6 +89,17 @@ public final class AmoreLicensing: Licensing {
     }
     
     /// Validates the stored license token and updates ``status``.
+    ///
+    /// The token is verified locally (signature, expiry, hardware ID). If it is
+    /// stale for the configured ``ValidationFrequency`` (or has expired) it is
+    /// refreshed from the server; if that refresh fails the license enters its
+    /// ``LicensingConfiguration/gracePeriod``.
+    ///
+    /// AmoreLicensing calls this automatically once at launch (for every
+    /// ``ValidationFrequency`` except ``ValidationFrequency/manual``). It does
+    /// **not** run a background timer, so call this yourself at the lifecycle
+    /// moments that matter, for example when your main window returns to the
+    /// foreground, to keep a long-running app's ``status`` fresh.
     /// - Returns: The resulting ``ValidationStatus``.
     /// - Throws: ``AmoreError`` if validation fails.
     @discardableResult
@@ -123,7 +124,7 @@ public final class AmoreLicensing: Licensing {
                 status = .invalid
                 throw AmoreError.hardwareIdMismatch
             }
-            if shouldRefreshProactively(issuedAt: payload.iat.value) {
+            if configuration.validationFrequency.isRefreshDue(issuedAt: payload.iat.value) {
                 result = try await refreshToken(token, currentPayload: payload)
             } else {
                 status = .valid(License(from: payload))
@@ -136,28 +137,10 @@ public final class AmoreLicensing: Licensing {
             result = try await refreshToken(token)
         }
         
-        if shouldAutoValidate, case .valid = result { startAutoValidation() }
         return result
     }
     
     // MARK: - Private
-    
-    private func startAutoValidation() {
-        guard validationTask == nil else { return }
-        guard let interval = configuration.validationFrequency.timeInterval, interval > 0 else { return }
-        validationTask = Task(name: "AmoreKit.ValidationTask", priority: .background) {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(interval))
-                guard !Task.isCancelled else { return }
-                _ = try? await validate()
-            }
-        }
-    }
-    
-    private func stopAutoValidation() {
-        validationTask?.cancel()
-        validationTask = nil
-    }
     
     private func refreshToken(
         _ token: String,
@@ -172,7 +155,6 @@ public final class AmoreLicensing: Licensing {
             return status
         } catch let error as ClientError {
             status = .invalid
-            stopAutoValidation()
             throw .client(error)
         } catch let error as AmoreError {
             if let currentPayload {
@@ -188,11 +170,6 @@ public final class AmoreLicensing: Licensing {
             }
             return await applyGracePeriod(token: token)
         }
-    }
-    
-    private func shouldRefreshProactively(issuedAt: Date) -> Bool {
-        guard let interval = configuration.validationFrequency.timeInterval else { return false }
-        return Date().timeIntervalSince(issuedAt) >= interval
     }
     
     private func applyGracePeriod(token: String) async -> ValidationStatus {

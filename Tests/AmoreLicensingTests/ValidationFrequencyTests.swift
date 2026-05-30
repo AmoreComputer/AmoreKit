@@ -232,153 +232,18 @@ import Testing
         #expect(serverCalled)
     }
     
-    // MARK: - Auto-validate scheduling
+    // MARK: - Consumer-driven lifecycle
     
-    @Test func autoValidateSchedulesAfterActivation() async throws {
-        let (privateKey, publicKey) = try makeKeys()
-        let mock = MockLicenseClient()
-        var validateCallCount = 0
-        
-        mock.onActivate = { [self] _, hwId, nonce in
-            try await signToken(privateKey: privateKey, nonce: nonce)
-        }
-        mock.onValidate = { [self] _, nonce in
-            validateCallCount += 1
-            return try await signToken(privateKey: privateKey, nonce: nonce)
-        }
-        
-        let config = LicensingConfiguration(validationFrequency: .seconds(0.05))
-        let (client, _, _) = makeClient(
-            publicKey: publicKey,
-            configuration: config,
-            licenseClient: mock
-        )
-        
-        // Before activation — no periodic checks should happen
-        try await Task.sleep(for: .seconds(0.15))
-        #expect(validateCallCount == 0)
-        
-        // Activate — this should start the periodic task
-        try await client.activate(licenseKey: "KEY")
-        try await Task.sleep(for: .seconds(0.3))
-        
-        guard case .valid = client.status else {
-            Issue.record("Expected valid, got \(client.status)")
-            return
-        }
-        #expect(validateCallCount >= 2)
-    }
-    
-    @Test func autoValidateSchedulesAfterValidate() async throws {
+    @Test func manualFrequencyDoesNotRefresh() async throws {
         let (privateKey, publicKey) = try makeKeys()
         let store = MockTokenStore()
         let token = try await signToken(privateKey: privateKey, nonce: "stored")
         try store.store(token)
         
         let mock = MockLicenseClient()
-        var validateCallCount = 0
-        mock.onValidate = { [self] _, nonce in
-            validateCallCount += 1
-            return try await signToken(privateKey: privateKey, nonce: nonce)
-        }
-        
-        let config = LicensingConfiguration(validationFrequency: .seconds(0.05))
-        let (client, _, _) = makeClient(
-            publicKey: publicKey,
-            configuration: config,
-            tokenStore: store,
-            licenseClient: mock
-        )
-        
-        // Trigger validate with a stored token — should start periodic task
-        try await client.validate()
-        try await Task.sleep(for: .seconds(0.3))
-        
-        guard case .valid = client.status else {
-            Issue.record("Expected valid, got \(client.status)")
-            return
-        }
-        #expect(validateCallCount >= 2)
-    }
-    
-    @Test func autoValidateNoScheduleForAfterExpiration() async throws {
-        let (privateKey, publicKey) = try makeKeys()
-        let store = MockTokenStore()
-        let token = try await signToken(privateKey: privateKey, nonce: "stored")
-        try store.store(token)
-        
-        let mock = MockLicenseClient()
-        var callCount = 0
+        var serverCalled = false
         mock.onValidate = { _, _ in
-            callCount += 1
-            throw URLError(.notConnectedToInternet)
-        }
-        
-        let config = LicensingConfiguration(validationFrequency: .afterExpiration)
-        let (client, _, _) = makeClient(
-            publicKey: publicKey,
-            configuration: config,
-            tokenStore: store,
-            licenseClient: mock
-        )
-        
-        // Trigger validate to attempt auto-validation start
-        try await client.validate()
-        try await Task.sleep(for: .seconds(0.2))
-        
-        guard case .valid = client.status else {
-            Issue.record("Expected valid, got \(client.status)")
-            return
-        }
-        #expect(callCount == 0)
-    }
-    
-    @Test func autoValidateStopsOnServerRejection() async throws {
-        let (privateKey, publicKey) = try makeKeys()
-        let store = MockTokenStore()
-        let token = try await signToken(privateKey: privateKey, nonce: "stored")
-        try store.store(token)
-        
-        let mock = MockLicenseClient()
-        var validateCallCount = 0
-        mock.onValidate = { [self] _, nonce in
-            validateCallCount += 1
-            if validateCallCount >= 3 {
-                throw ClientError.licenseExpired
-            }
-            return try await signToken(privateKey: privateKey, nonce: nonce)
-        }
-        
-        let config = LicensingConfiguration(validationFrequency: .seconds(0.05))
-        let (client, _, _) = makeClient(
-            publicKey: publicKey,
-            configuration: config,
-            tokenStore: store,
-            licenseClient: mock
-        )
-        
-        // Start periodic validation
-        try await client.validate()
-        // Wait for rejection to happen
-        try await Task.sleep(for: .seconds(0.5))
-        
-        #expect(client.status == .invalid)
-        // Record count after rejection, wait more, verify no additional calls
-        let countAfterRejection = validateCallCount
-        try await Task.sleep(for: .seconds(0.2))
-        #expect(validateCallCount == countAfterRejection)
-    }
-    
-    @Test func manualFrequencyDoesNotAutoValidate() async throws {
-        let (privateKey, publicKey) = try makeKeys()
-        let store = MockTokenStore()
-        let token = try await signToken(privateKey: privateKey, nonce: "stored")
-        try store.store(token)
-        
-        let mock = MockLicenseClient()
-        var callCount = 0
-        mock.onValidate = { _, _ in
-            callCount += 1
+            serverCalled = true
             throw URLError(.notConnectedToInternet)
         }
         
@@ -390,46 +255,89 @@ import Testing
             licenseClient: mock
         )
         
-        try await client.validate()
-        try await Task.sleep(for: .seconds(0.2))
+        let result = try await client.validate()
         
-        guard case .valid = client.status else {
-            Issue.record("Expected valid, got \(client.status)")
+        guard case .valid = result else {
+            Issue.record("Expected valid, got \(result)")
             return
         }
-        #expect(callCount == 0)
+        #expect(!serverCalled)
     }
     
-    @Test func autoValidateStopsOnDeactivation() async throws {
+    @Test func deactivateResetsStatusToUnknown() async throws {
         let (privateKey, publicKey) = try makeKeys()
+        let store = MockTokenStore()
+        let token = try await signToken(privateKey: privateKey, nonce: "stored")
+        try store.store(token)
+        
         let mock = MockLicenseClient()
-        var validateCallCount = 0
-        
-        mock.onActivate = { [self] _, hwId, nonce in
-            try await signToken(privateKey: privateKey, nonce: nonce)
-        }
         mock.onDeactivate = { _ in }
-        mock.onValidate = { [self] _, nonce in
-            validateCallCount += 1
-            return try await signToken(privateKey: privateKey, nonce: nonce)
-        }
         
-        let config = LicensingConfiguration(validationFrequency: .seconds(0.05))
+        // .manual ⇒ no launch validation, so every status change is driven explicitly here.
+        let config = LicensingConfiguration(validationFrequency: .manual)
         let (client, _, _) = makeClient(
             publicKey: publicKey,
             configuration: config,
+            tokenStore: store,
             licenseClient: mock
         )
         
-        try await client.activate(licenseKey: "KEY")
-        try await Task.sleep(for: .seconds(0.2))
-        #expect(validateCallCount >= 1)
+        try await client.validate()
+        guard case .valid = client.status else {
+            Issue.record("Expected valid before deactivation, got \(client.status)")
+            return
+        }
         
-        // Deactivate — task should stop
         try await client.deactivate()
-        let countAfterDeactivation = validateCallCount
-        try await Task.sleep(for: .seconds(0.2))
-        #expect(validateCallCount == countAfterDeactivation)
         #expect(client.status == .unknown)
+    }
+}
+
+/// Pure, timing-free coverage of the staleness policy that drives ``AmoreLicensing/validate()``.
+@Suite struct ValidationFrequencyPolicyTests {
+    private func daysAgo(_ days: Double) -> Date {
+        Date().addingTimeInterval(-days * 86_400)
+    }
+    
+    @Test func manualNeverRefreshes() {
+        #expect(!ValidationFrequency.manual.isRefreshDue(issuedAt: daysAgo(365)))
+    }
+    
+    @Test func afterExpirationNeverRefreshesProactively() {
+        #expect(!ValidationFrequency.afterExpiration.isRefreshDue(issuedAt: daysAgo(365)))
+    }
+    
+    @Test func everyLaunchAlwaysRefreshes() {
+        #expect(ValidationFrequency.everyLaunch.isRefreshDue(issuedAt: Date()))
+    }
+    
+    @Test func dailyRefreshesOnlyAfterADay() {
+        #expect(ValidationFrequency.daily.isRefreshDue(issuedAt: daysAgo(2)))
+        #expect(!ValidationFrequency.daily.isRefreshDue(issuedAt: daysAgo(0.5)))
+    }
+    
+    @Test func weeklyRefreshesOnlyAfterAWeek() {
+        #expect(ValidationFrequency.weekly.isRefreshDue(issuedAt: daysAgo(8)))
+        #expect(!ValidationFrequency.weekly.isRefreshDue(issuedAt: daysAgo(3)))
+    }
+    
+    @Test func monthlyRefreshesOnlyAfterAMonth() {
+        #expect(ValidationFrequency.monthly.isRefreshDue(issuedAt: daysAgo(31)))
+        #expect(!ValidationFrequency.monthly.isRefreshDue(issuedAt: daysAgo(15)))
+    }
+    
+    @Test func secondsRefreshesAfterCustomInterval() {
+        #expect(ValidationFrequency.seconds(60).isRefreshDue(issuedAt: Date().addingTimeInterval(-120)))
+        #expect(!ValidationFrequency.seconds(60).isRefreshDue(issuedAt: Date().addingTimeInterval(-10)))
+    }
+    
+    @Test func shouldValidateAtLaunchForEveryFrequencyExceptManual() {
+        #expect(ValidationFrequency.weekly.shouldValidateAtLaunch)
+        #expect(ValidationFrequency.daily.shouldValidateAtLaunch)
+        #expect(ValidationFrequency.monthly.shouldValidateAtLaunch)
+        #expect(ValidationFrequency.everyLaunch.shouldValidateAtLaunch)
+        #expect(ValidationFrequency.afterExpiration.shouldValidateAtLaunch)
+        #expect(ValidationFrequency.seconds(1).shouldValidateAtLaunch)
+        #expect(!ValidationFrequency.manual.shouldValidateAtLaunch)
     }
 }

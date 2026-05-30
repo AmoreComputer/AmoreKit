@@ -1,21 +1,41 @@
 import Foundation
 
-/// How often the license should be re-validated with the server.
+/// How stale a stored license may become before ``AmoreLicensing/validate()``
+/// refreshes it from the server.
+///
+/// AmoreLicensing validates once at launch (except ``manual``); drive any
+/// further checks by calling ``AmoreLicensing/validate()`` from your app's
+/// lifecycle, for example when the window comes to the foreground.
 public enum ValidationFrequency: Sendable, Equatable {
-    /// Only re-validate after the token has expired.
+    /// Only refresh once the token has expired.
     case afterExpiration
-    /// Re-validate once per day.
+    /// Refresh when the token is more than a day old.
     case daily
-    /// Re-validate on every app launch.
+    /// Refresh on every ``AmoreLicensing/validate()`` call.
     case everyLaunch
-    /// No automatic re-validation. Call ``AmoreLicensing/validate()`` manually.
+    /// Never refresh proactively. Call ``AmoreLicensing/validate()`` yourself.
     case manual
-    /// Re-validate once per month.
+    /// Refresh when the token is more than a month old.
     case monthly
-    /// Re-validate after a custom interval.
+    /// Refresh after a custom interval.
     case seconds(TimeInterval)
-    /// Re-validate once per week.
+    /// Refresh when the token is more than a week old.
     case weekly
+
+    /// Whether a server refresh is due for a token issued at `issuedAt`.
+    ///
+    /// ``manual`` and ``afterExpiration`` never refresh proactively (the token
+    /// is only refreshed once it has actually expired); ``everyLaunch`` always
+    /// refreshes; interval-based cases refresh once the interval has elapsed.
+    func isRefreshDue(issuedAt: Date) -> Bool {
+        guard let interval = timeInterval else { return false }
+        return Date().timeIntervalSince(issuedAt) >= interval
+    }
+
+    /// Whether the license should be validated automatically at app launch.
+    var shouldValidateAtLaunch: Bool {
+        self != .manual
+    }
 
     var timeInterval: TimeInterval? {
         switch self {
