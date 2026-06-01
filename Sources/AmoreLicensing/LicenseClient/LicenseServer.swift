@@ -25,7 +25,7 @@ public struct LicenseServer: Sendable {
     
     /// Creates a server configuration using the default Amore API paths for the given bundle identifier.
     public static func amore(for bundleIdentifier: String, baseURL: URL = .amoreServer) -> LicenseServer {
-        let base = "v1/apps/\(bundleIdentifier)/licenses"
+        let base = "v2/apps/\(bundleIdentifier)/licenses"
         return LicenseServer(
             baseURL: baseURL,
             activatePath: "\(base)/activate",

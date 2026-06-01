@@ -34,9 +34,9 @@ import Testing
     @Test func amoreFactoryProducesExpectedPaths() {
         let server = LicenseServer.amore(for: "com.test.app", baseURL: baseURL)
 
-        #expect(server.activateURL.absoluteString == "https://api.amore.computer/v1/apps/com.test.app/licenses/activate")
-        #expect(server.deactivateURL.absoluteString == "https://api.amore.computer/v1/apps/com.test.app/licenses/deactivate")
-        #expect(server.validateURL.absoluteString == "https://api.amore.computer/v1/apps/com.test.app/licenses/validate")
+        #expect(server.activateURL.absoluteString == "https://api.amore.computer/v2/apps/com.test.app/licenses/activate")
+        #expect(server.deactivateURL.absoluteString == "https://api.amore.computer/v2/apps/com.test.app/licenses/deactivate")
+        #expect(server.validateURL.absoluteString == "https://api.amore.computer/v2/apps/com.test.app/licenses/validate")
     }
 
     @Test func baseURLWithTrailingSlashDoesNotDoubleSlash() {
