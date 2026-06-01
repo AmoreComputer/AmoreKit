@@ -1,6 +1,6 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
 	"redirects": [
-		{ "source": "/", "destination": "/documentation/amorelicensing" }
+		{ "source": "/", "destination": "/documentation" }
 	]
 }
