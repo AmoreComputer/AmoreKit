@@ -26,7 +26,7 @@ struct LicensePayloadDecodeTests {
           "hardware_id": "hw-1",
           "license_id": "C7B53B0E-2C18-4F1D-8C9B-2B7B6A8B6A7E",
           "nonce": "n-1",
-          "product": "Pro",
+          "product": { "name": "Pro", "identifier": "pro" },
           "entitlements": [],
           "subscription_state": { "state": "renewing", "renews_at": 1780272000 }
         }
@@ -47,7 +47,7 @@ struct LicensePayloadDecodeTests {
           "hardware_id": "hw-1",
           "license_id": "C7B53B0E-2C18-4F1D-8C9B-2B7B6A8B6A7E",
           "nonce": "n-1",
-          "product": "Pro",
+          "product": { "name": "Pro", "identifier": "pro" },
           "entitlements": []
         }
         """
@@ -63,7 +63,7 @@ struct LicensePayloadDecodeTests {
           "hardware_id": "hw-1",
           "license_id": "C7B53B0E-2C18-4F1D-8C9B-2B7B6A8B6A7E",
           "nonce": "n-1",
-          "product": "Pro",
+          "product": { "name": "Pro", "identifier": "pro" },
           "entitlements": [],
           "subscription_state": { "state": "paused" }
         }
@@ -80,7 +80,7 @@ struct LicensePayloadDecodeTests {
           "hardware_id": "hw-1",
           "license_id": "C7B53B0E-2C18-4F1D-8C9B-2B7B6A8B6A7E",
           "nonce": "n-1",
-          "product": "Pro",
+          "product": { "name": "Pro", "identifier": "pro" },
           "entitlements": [],
           "subscription_state": { "state": "lapsed" }
         }

@@ -25,7 +25,8 @@ import Testing
             hardwareId: hardwareId,
             iat: .init(value: iat),
             licenseId: UUID(),
-            nonce: nonce
+            nonce: nonce,
+            product: .testSample
         )
         let keys = await JWTKeyCollection().add(eddsa: privateKey)
         return try await keys.sign(payload)

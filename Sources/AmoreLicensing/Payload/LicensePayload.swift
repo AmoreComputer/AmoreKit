@@ -7,7 +7,7 @@ protocol LicensePayloadProtocol {
     var iat: IssuedAtClaim { get }
     var licenseId: UUID { get }
     var nonce: String { get }
-    var product: String { get }
+    var product: Product { get }
     var entitlements: Set<License.Entitlement> { get }
     var subscriptionState: SubscriptionState? { get }
 }
@@ -18,7 +18,7 @@ struct LicensePayload: JWTPayload, LicensePayloadProtocol {
     var iat: IssuedAtClaim
     var licenseId: UUID
     var nonce: String
-    var product: String = "Amore"
+    var product: Product
     var entitlements: Set<License.Entitlement> = []
     var subscriptionState: SubscriptionState?
     
@@ -44,7 +44,7 @@ struct GracePeriodPayload: JWTPayload, LicensePayloadProtocol {
     var iat: IssuedAtClaim
     var licenseId: UUID
     var nonce: String
-    var product: String = "Amore"
+    var product: Product
     var entitlements: Set<License.Entitlement> = []
     var subscriptionState: SubscriptionState?
     

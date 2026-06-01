@@ -19,14 +19,16 @@ import Testing
         hardwareId: String,
         nonce: String,
         exp: Date = Date().addingTimeInterval(30 * 24 * 3600),
-        licenseId: UUID = UUID()
+        licenseId: UUID = UUID(),
+        product: Product = .testSample
     ) async throws -> String {
         let payload = LicensePayload(
             exp: .init(value: exp),
             hardwareId: hardwareId,
             iat: .init(value: Date()),
             licenseId: licenseId,
-            nonce: nonce
+            nonce: nonce,
+            product: product
         )
         let keys = await JWTKeyCollection().add(eddsa: privateKey)
         return try await keys.sign(payload)
