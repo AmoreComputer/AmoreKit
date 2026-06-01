@@ -38,14 +38,14 @@ struct EntitlementTests {
     
     @Test
     func `Use EntitlementProtocol Enum`() {
-        let license = License(id: UUID(), name: "Amore", entitlements: ["a"])
+        let license = License(id: UUID(), product: .testSample, entitlements: ["a"])
         #expect(license.validate(entitlement: AppEntitlement.a))
         #expect(!license.validate(entitlement: AppEntitlement.b))
     }
     
     @Test
     func `Use License.Entitlement extension`() {
-        let license = License(id: UUID(), name: "Amore", entitlements: [.dmg])
+        let license = License(id: UUID(), product: .testSample, entitlements: [.dmg])
         #expect(license.validate(entitlement: .dmg))
         #expect(!license.validate(entitlement: .s3))
     }
