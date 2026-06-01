@@ -12,6 +12,10 @@ let package = Package(
             name: "AmoreLicensing",
             targets: ["AmoreLicensing"]
         ),
+        .library(
+            name: "AmoreStore",
+            targets: ["AmoreStore"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
@@ -24,12 +28,17 @@ let package = Package(
                 .product(name: "JWTKit", package: "jwt-kit"),
             ],
         ),
+        .target(name: "AmoreStore"),
         .testTarget(
             name: "AmoreLicensingTests",
             dependencies: [
                 "AmoreLicensing",
                 .product(name: "JWTKit", package: "jwt-kit"),
             ]
+        ),
+        .testTarget(
+            name: "AmoreStoreTests",
+            dependencies: ["AmoreStore"]
         ),
     ],
     swiftLanguageModes: [.v6]
