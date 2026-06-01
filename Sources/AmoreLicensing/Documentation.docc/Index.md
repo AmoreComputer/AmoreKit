@@ -32,6 +32,11 @@ AmoreLicensing provides an `@Observable` class that manages the full license lif
 - ``ValidationFrequency``
 - ``GracePeriod``
 
+### Token Storage
+
+- ``TokenStore``
+- ``FileTokenStore``
+
 ### Errors
 
 - ``AmoreError``

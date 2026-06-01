@@ -25,17 +25,19 @@ public final class AmoreLicensing: Licensing {
     ///   - bundleIdentifier: The app's bundle identifier. Defaults to `Bundle.main.bundleIdentifier`.
     ///   - configuration: The licensing configuration. Defaults to ``LicensingConfiguration/default``.
     ///   - server: The license server to use. Defaults to the Amore server.
+    ///   - tokenStore: A custom store for persisting the license token. Defaults to a ``FileTokenStore`` in Application Support. Provide a custom ``TokenStore`` to store the token elsewhere.
     public init(
         publicKey: String,
         bundleIdentifier: String? = nil,
         configuration: LicensingConfiguration = .default,
         server: LicenseServer? = nil,
+        tokenStore: (any TokenStore)? = nil
     ) throws {
         let bundleIdentifier = bundleIdentifier ?? Bundle.main.bundleIdentifier ?? publicKey
         self.configuration = configuration
         self.publicKey = try EdDSA.PublicKey(x: publicKey, curve: .ed25519)
         self.bundleIdentifier = bundleIdentifier
-        self.tokenStore = FileTokenStore(bundleIdentifier: bundleIdentifier)
+        self.tokenStore = tokenStore ?? FileTokenStore(bundleIdentifier: bundleIdentifier)
         self.hardwareIdentifier = MacHardwareIdentifier()
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(for: bundleIdentifier))
         if configuration.validationFrequency.shouldValidateAtLaunch {
