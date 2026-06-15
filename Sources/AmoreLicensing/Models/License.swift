@@ -13,6 +13,9 @@ public struct License: Identifiable, Hashable, Codable, Sendable {
     /// Subscription state if this license is subscription-backed,
     /// or `nil` for perpetual / one-time-purchase licenses.
     public var subscriptionState: SubscriptionState?
+    /// The customer this license was issued to, or `nil` if the license has no
+    /// associated customer. Use `customer?.email` to show "Licensed to <email>".
+    public var customer: Customer?
 
     /// The product name this license is for.
     @available(*, deprecated, renamed: "product.name", message: "Use `product.name` instead.")
@@ -27,7 +30,8 @@ extension License {
             product: payload.product,
             expiresAt: payload.exp.value,
             entitlements: payload.entitlements,
-            subscriptionState: payload.subscriptionState
+            subscriptionState: payload.subscriptionState,
+            customer: payload.customer
         )
     }
     
