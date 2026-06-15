@@ -126,4 +126,26 @@ struct LicensePayloadDecodeTests {
         let license = License(from: payload)
         #expect(license.customer == nil)
     }
+
+    // A `customer` object may be present without an `email` (partial or
+    // forward-compatible token). It must decode with a nil email rather than
+    // throw and reject the entire license.
+    @Test func customerDecodesWithNilEmailWhenObjectHasNoEmail() throws {
+        let json = """
+        {
+          "exp": 1800000000,
+          "iat": 1779000000,
+          "hardware_id": "hw-1",
+          "license_id": "C7B53B0E-2C18-4F1D-8C9B-2B7B6A8B6A7E",
+          "nonce": "n-1",
+          "product": { "name": "Pro", "identifier": "pro" },
+          "entitlements": [],
+          "customer": {}
+        }
+        """
+        let payload = try decodePayload(json)
+        let license = License(from: payload)
+        #expect(license.customer != nil)
+        #expect(license.customer?.email == nil)
+    }
 }
