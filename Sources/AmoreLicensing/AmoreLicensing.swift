@@ -131,10 +131,8 @@ public final class AmoreLicensing: Licensing {
         case .unverifiable:
             try await refreshToken(token)
         case .decoded(let payload):
-            if payload.exp < Date() {
-                try await refreshToken(token)
-            } else if configuration.validationFrequency.isRefreshDue(issuedAt: payload.iat) {
-                try await refreshToken(token, currentPayload: payload)
+            if payload.exp < Date() || configuration.validationFrequency.isRefreshDue(issuedAt: payload.iat) {
+                try await refreshToken(token, localPayload: payload)
             } else {
                 status = .valid(License(from: payload))
             }
@@ -159,11 +157,12 @@ public final class AmoreLicensing: Licensing {
     }
     
     /// Refreshes the token from the server and updates ``status``. On a transient
-    /// failure it falls back to `currentPayload` if still locally valid, otherwise
-    /// to the grace period; a ``ClientError`` invalidates the license.
+    /// failure it keeps `localPayload` while still valid, falls back to the grace
+    /// period once it has expired, and invalidates when there is nothing to fall
+    /// back on; a ``ClientError`` always invalidates the license.
     private func refreshToken(
         _ token: String,
-        currentPayload: LicensePayload? = nil
+        localPayload: LicensePayload? = nil
     ) async throws(AmoreError) {
         let nonce = UUID().uuidString
         do {
@@ -175,20 +174,19 @@ public final class AmoreLicensing: Licensing {
             status = .invalid
             throw .client(error)
         } catch let error as AmoreError {
-            guard let currentPayload else { throw error }
-            status = .valid(License(from: currentPayload))
+            guard let localPayload, localPayload.exp > Date() else { throw error }
+            status = .valid(License(from: localPayload))
         } catch {
-            guard let currentPayload else { applyGracePeriod(token: token); return }
+            guard let localPayload else { status = .invalid; return }
+            guard localPayload.exp > Date() else { applyGracePeriod(payload: localPayload); return }
             // Token still valid locally, keep using it.
-            status = .valid(License(from: currentPayload))
+            status = .valid(License(from: localPayload))
         }
     }
     
-    private func applyGracePeriod(token: String) {
-        guard case .decoded(let payload) = verifier.decodeLocally(token) else {
-            status = .invalid
-            return
-        }
+    /// Enters the grace period derived from an already-verified, expired payload,
+    /// or invalidates once that grace period has elapsed.
+    private func applyGracePeriod(payload: LicensePayload) {
         let graceEnd = payload.exp.addingTimeInterval(configuration.gracePeriod.timeInterval)
         var license = License(from: payload)
         license.expiresAt = graceEnd
