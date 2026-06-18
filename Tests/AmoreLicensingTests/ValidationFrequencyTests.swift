@@ -1,5 +1,6 @@
+import AmoreJWT
+import Crypto
 import Foundation
-import JWTKit
 import Testing
 
 @testable import AmoreLicensing
@@ -9,31 +10,30 @@ import Testing
     private let hardwareId = "TEST-SERIAL-123"
     private let bundleId = "com.test.amorekit"
     
-    private func makeKeys() throws -> (EdDSA.PrivateKey, EdDSA.PublicKey) {
-        let privateKey = try EdDSA.PrivateKey(curve: .ed25519)
+    private func makeKeys() -> (Curve25519.Signing.PrivateKey, Curve25519.Signing.PublicKey) {
+        let privateKey = Curve25519.Signing.PrivateKey()
         return (privateKey, privateKey.publicKey)
     }
     
     private func signToken(
-        privateKey: EdDSA.PrivateKey,
+        privateKey: Curve25519.Signing.PrivateKey,
         nonce: String,
         iat: Date = Date(),
         exp: Date = Date().addingTimeInterval(30 * 24 * 3600)
-    ) async throws -> String {
+    ) throws -> String {
         let payload = LicensePayload(
-            exp: .init(value: exp),
+            exp: exp,
             hardwareId: hardwareId,
-            iat: .init(value: iat),
+            iat: iat,
             licenseId: UUID(),
             nonce: nonce,
             product: .testSample
         )
-        let keys = await JWTKeyCollection().add(eddsa: privateKey)
-        return try await keys.sign(payload)
+        return try EdDSAJWT.sign(payload, using: privateKey)
     }
     
     private func makeClient(
-        publicKey: EdDSA.PublicKey,
+        publicKey: Curve25519.Signing.PublicKey,
         configuration: LicensingConfiguration,
         tokenStore: MockTokenStore = MockTokenStore(),
         licenseClient: MockLicenseClient = MockLicenseClient()
@@ -52,9 +52,9 @@ import Testing
     // MARK: - afterExpiration (default behavior)
     
     @Test func validTokenSkipsServerWhenAfterExpiration() async throws {
-        let (privateKey, publicKey) = try makeKeys()
+        let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
-        let token = try await signToken(privateKey: privateKey, nonce: "stored")
+        let token = try signToken(privateKey: privateKey, nonce: "stored")
         try store.store(token)
         
         let mock = MockLicenseClient()
@@ -83,10 +83,10 @@ import Testing
     // MARK: - Proactive refresh
     
     @Test func validTokenContactsServerWhenIntervalElapsed() async throws {
-        let (privateKey, publicKey) = try makeKeys()
+        let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
         // Token issued 2 days ago — daily check should trigger
-        let token = try await signToken(
+        let token = try signToken(
             privateKey: privateKey, nonce: "old",
             iat: Date().addingTimeInterval(-2 * 86_400)
         )
@@ -94,7 +94,7 @@ import Testing
         
         let mock = MockLicenseClient()
         mock.onValidate = { [self] _, nonce in
-            try await signToken(privateKey: privateKey, nonce: nonce)
+            try signToken(privateKey: privateKey, nonce: nonce)
         }
         
         let config = LicensingConfiguration(validationFrequency: .daily)
@@ -116,10 +116,10 @@ import Testing
     }
     
     @Test func validTokenSkipsServerWhenIntervalNotElapsed() async throws {
-        let (privateKey, publicKey) = try makeKeys()
+        let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
         // Token issued 1 hour ago — daily check should NOT trigger
-        let token = try await signToken(
+        let token = try signToken(
             privateKey: privateKey, nonce: "fresh",
             iat: Date().addingTimeInterval(-3600)
         )
@@ -150,9 +150,9 @@ import Testing
     }
     
     @Test func proactiveCheckNetworkFailureKeepsValid() async throws {
-        let (privateKey, publicKey) = try makeKeys()
+        let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
-        let token = try await signToken(
+        let token = try signToken(
             privateKey: privateKey, nonce: "stored",
             iat: Date().addingTimeInterval(-2 * 86_400)
         )
@@ -178,9 +178,9 @@ import Testing
     }
     
     @Test func proactiveCheckServerRejectionSetsInvalid() async throws {
-        let (privateKey, publicKey) = try makeKeys()
+        let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
-        let token = try await signToken(
+        let token = try signToken(
             privateKey: privateKey, nonce: "stored",
             iat: Date().addingTimeInterval(-2 * 86_400)
         )
@@ -204,16 +204,16 @@ import Testing
     }
     
     @Test func everyLaunchAlwaysContactsServer() async throws {
-        let (privateKey, publicKey) = try makeKeys()
+        let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
-        let token = try await signToken(privateKey: privateKey, nonce: "fresh")
+        let token = try signToken(privateKey: privateKey, nonce: "fresh")
         try store.store(token)
         
         let mock = MockLicenseClient()
         var serverCalled = false
         mock.onValidate = { [self] _, nonce in
             serverCalled = true
-            return try await signToken(privateKey: privateKey, nonce: nonce)
+            return try signToken(privateKey: privateKey, nonce: nonce)
         }
         
         let config = LicensingConfiguration(validationFrequency: .everyLaunch)
@@ -236,9 +236,9 @@ import Testing
     // MARK: - Consumer-driven lifecycle
     
     @Test func manualFrequencyDoesNotRefresh() async throws {
-        let (privateKey, publicKey) = try makeKeys()
+        let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
-        let token = try await signToken(privateKey: privateKey, nonce: "stored")
+        let token = try signToken(privateKey: privateKey, nonce: "stored")
         try store.store(token)
         
         let mock = MockLicenseClient()
@@ -266,9 +266,9 @@ import Testing
     }
     
     @Test func deactivateResetsStatusToUnknown() async throws {
-        let (privateKey, publicKey) = try makeKeys()
+        let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
-        let token = try await signToken(privateKey: privateKey, nonce: "stored")
+        let token = try signToken(privateKey: privateKey, nonce: "stored")
         try store.store(token)
         
         let mock = MockLicenseClient()
