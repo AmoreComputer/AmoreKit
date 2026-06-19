@@ -28,6 +28,8 @@ let licensing = try AmoreLicensing(
 
 > Note: All methods on ``AmoreLicensing`` throw ``AmoreError`` with detailed information about what went wrong.
 
+> Tip: The initializer above uses a built-in device identity that ships with macOS. On other platforms you must provide your own. See <doc:Custom-Device-Identity>.
+
 ## Activation
 
 To activate your user's license, call ``AmoreLicensing/activate(licenseKey:)`` with a valid license key.
