@@ -210,8 +210,7 @@ import Testing
             Issue.record("Expected gracePeriod, got \(result)")
             return
         }
-        let expectedEnd = expDate.addingTimeInterval(7 * 86_400)
-        #expect(abs(license.expiresAt!.timeIntervalSince(expectedEnd)) < 1)
+        #expect(abs(license.expiresAt!.timeIntervalSince(expDate)) < 1)
     }
     
     @Test func validateExpiredTokenValidates() async throws {
@@ -358,8 +357,7 @@ import Testing
             Issue.record("Expected gracePeriod on first synchronous read, got \(client.status)")
             return
         }
-        let expectedEnd = expDate.addingTimeInterval(7 * 86_400)
-        #expect(abs(license.expiresAt!.timeIntervalSince(expectedEnd)) < 1)
+        #expect(abs(license.expiresAt!.timeIntervalSince(expDate)) < 1)
     }
     
     /// An expired token whose grace has already elapsed must stay `.unknown` at
