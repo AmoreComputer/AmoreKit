@@ -1,14 +1,21 @@
+#if os(macOS)
 import Foundation
 import IOKit
+import SystemConfiguration
 
-struct MacHardwareIdentifier: HardwareIdentifier {
+struct MacDeviceIdentity: DeviceIdentity {
+    var deviceName: String {
+        (SCDynamicStoreCopyComputerName(nil, nil) as String?)
+        ?? ProcessInfo.processInfo.hostName
+    }
+    
     var identifier: String {
         let service = IOServiceGetMatchingService(
             kIOMainPortDefault,
             IOServiceMatching("IOPlatformExpertDevice")
         )
         defer { IOObjectRelease(service) }
-
+        
         guard let data = IORegistryEntryCreateCFProperty(
             service,
             "IOPlatformSerialNumber" as CFString,
@@ -20,3 +27,4 @@ struct MacHardwareIdentifier: HardwareIdentifier {
         return data
     }
 }
+#endif

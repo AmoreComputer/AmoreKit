@@ -1,5 +1,6 @@
 import Foundation
 import JWTKit
+import Observation
 
 /// Manages license activation, deactivation, and validation against an Amore licensing server.
 ///
@@ -11,7 +12,7 @@ public final class AmoreLicensing: Licensing {
     
     private let bundleIdentifier: String
     private let configuration: LicensingConfiguration
-    private let hardwareIdentifier: HardwareIdentifier
+    private let deviceIdentity: DeviceIdentity
     private let jwtCollection = JWTKeyCollection()
     private let licenseClient: LicenseClient
     private let publicKey: EdDSA.PublicKey
@@ -25,39 +26,70 @@ public final class AmoreLicensing: Licensing {
     ///   - bundleIdentifier: The app's bundle identifier. Defaults to `Bundle.main.bundleIdentifier`.
     ///   - configuration: The licensing configuration. Defaults to ``LicensingConfiguration/default``.
     ///   - server: The license server to use. Defaults to the Amore server.
+    ///   - deviceIdentity: How this device is identified when binding a license. On macOS, use the initializer without this parameter to default to the built-in identifier.
     ///   - tokenStore: A custom store for persisting the license token. Defaults to a ``FileTokenStore`` in Application Support. Provide a custom ``TokenStore`` to store the token elsewhere.
     public init(
         publicKey: String,
         bundleIdentifier: String? = nil,
         configuration: LicensingConfiguration = .default,
         server: LicenseServer? = nil,
-        tokenStore: (any TokenStore)? = nil
+        deviceIdentity: (any DeviceIdentity),
+        tokenStore: (any TokenStore)? = nil,
     ) throws {
         let bundleIdentifier = bundleIdentifier ?? Bundle.main.bundleIdentifier ?? publicKey
         self.configuration = configuration
         self.publicKey = try EdDSA.PublicKey(x: publicKey, curve: .ed25519)
         self.bundleIdentifier = bundleIdentifier
         self.tokenStore = tokenStore ?? FileTokenStore(bundleIdentifier: bundleIdentifier)
-        self.hardwareIdentifier = MacHardwareIdentifier()
+        self.deviceIdentity = deviceIdentity
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(for: bundleIdentifier))
         if configuration.validationFrequency.shouldValidateAtLaunch {
             Task { [self] in try? await validate() }
         }
     }
     
+#if os(macOS)
+    /// Creates a new licensing instance using the built-in macOS device identity.
+    ///
+    /// This is the recommended initializer on macOS. To control how the device is
+    /// identified, use the initializer that takes a `deviceIdentity` instead.
+    /// - Parameters:
+    ///   - publicKey: The Ed25519 public key used to verify server responses.
+    ///   - bundleIdentifier: The app's bundle identifier. Defaults to `Bundle.main.bundleIdentifier`.
+    ///   - configuration: The licensing configuration. Defaults to ``LicensingConfiguration/default``.
+    ///   - server: The license server to use. Defaults to the Amore server.
+    ///   - tokenStore: A custom store for persisting the license token. Defaults to a ``FileTokenStore`` in Application Support. Provide a custom ``TokenStore`` to store the token elsewhere.
+    public convenience init(
+        publicKey: String,
+        bundleIdentifier: String? = nil,
+        configuration: LicensingConfiguration = .default,
+        server: LicenseServer? = nil,
+        tokenStore: (any TokenStore)? = nil,
+    ) throws {
+        try self.init(
+            publicKey: publicKey,
+            bundleIdentifier: bundleIdentifier,
+            configuration: configuration,
+            server: server,
+            deviceIdentity: MacDeviceIdentity(),
+            tokenStore: tokenStore
+        )
+    }
+#endif
+    
     internal init(
         publicKey: EdDSA.PublicKey,
         bundleIdentifier: String,
         configuration: LicensingConfiguration = .default,
         tokenStore: TokenStore,
-        hardwareIdentifier: HardwareIdentifier,
+        deviceIdentity: DeviceIdentity,
         licenseClient: LicenseClient
     ) {
         self.configuration = configuration
         self.publicKey = publicKey
         self.bundleIdentifier = bundleIdentifier
         self.tokenStore = tokenStore
-        self.hardwareIdentifier = hardwareIdentifier
+        self.deviceIdentity = deviceIdentity
         self.licenseClient = licenseClient
     }
     
@@ -68,8 +100,8 @@ public final class AmoreLicensing: Licensing {
         let nonce = UUID().uuidString
         let token = try await mapClientErrors {
             try await self.licenseClient.activate(
-                licenseKey: licenseKey, hardwareId: self.hardwareIdentifier.identifier, nonce: nonce,
-                name: Host.current().localizedName
+                licenseKey: licenseKey, hardwareId: self.deviceIdentity.identifier, nonce: nonce,
+                name: self.deviceIdentity.deviceName
             )
         }
         let payload = try await verifyToken(token, expectedNonce: nonce)
@@ -122,7 +154,7 @@ public final class AmoreLicensing: Licensing {
         let result: ValidationStatus
         do {
             let payload = try await jwtCollection.verify(token, as: LicensePayload.self)
-            guard payload.hardwareId == hardwareIdentifier.identifier else {
+            guard payload.hardwareId == deviceIdentity.identifier else {
                 status = .invalid
                 throw AmoreError.hardwareIdMismatch
             }
@@ -220,7 +252,7 @@ public final class AmoreLicensing: Licensing {
             throw .invalidSignature
         }
         guard payload.nonce == expectedNonce else { throw .nonceMismatch }
-        guard payload.hardwareId == hardwareIdentifier.identifier else { throw .hardwareIdMismatch }
+        guard payload.hardwareId == deviceIdentity.identifier else { throw .hardwareIdMismatch }
         return payload
     }
     

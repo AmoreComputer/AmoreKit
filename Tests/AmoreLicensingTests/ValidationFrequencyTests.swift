@@ -43,7 +43,7 @@ import Testing
             bundleIdentifier: bundleId,
             configuration: configuration,
             tokenStore: tokenStore,
-            hardwareIdentifier: MockHardwareIdentifier(identifier: hardwareId),
+            deviceIdentity: MockDeviceIdentity(identifier: hardwareId),
             licenseClient: licenseClient
         )
         return (client, tokenStore, licenseClient)
