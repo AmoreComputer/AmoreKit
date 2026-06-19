@@ -333,7 +333,58 @@ import Testing
             return
         }
     }
-
+    
+    /// An expired token that is still within grace must surface `.gracePeriod`
+    /// synchronously at launch, rather than reading `.unknown` until the async
+    /// refresh fails and applies grace.
+    @Test func launchInitializerSurfacesGracePeriodForTokenWithinGraceSynchronously() throws {
+        let (privateKey, publicKey) = makeKeys()
+        let hardwareId = MacHardwareIdentifier().identifier
+        let store = MockTokenStore()
+        let expDate = Date().addingTimeInterval(-2 * 24 * 3600) // expired 2 days ago
+        let token = try signToken(
+            privateKey: privateKey, hardwareId: hardwareId, nonce: "stored", exp: expDate
+        )
+        try store.store(token)
+        
+        let client = try AmoreLicensing(
+            publicKey: publicKey.rawRepresentation.base64URLEncodedString(),
+            bundleIdentifier: bundleId,
+            server: unreachableServer(),
+            tokenStore: store
+        )
+        
+        guard case .gracePeriod(let license) = client.status else {
+            Issue.record("Expected gracePeriod on first synchronous read, got \(client.status)")
+            return
+        }
+        let expectedEnd = expDate.addingTimeInterval(7 * 86_400)
+        #expect(abs(license.expiresAt!.timeIntervalSince(expectedEnd)) < 1)
+    }
+    
+    /// An expired token whose grace has already elapsed must stay `.unknown` at
+    /// launch, not synchronously `.invalid`: the server may still renew it, so the
+    /// async `validate()` makes that call.
+    @Test func launchInitializerStaysUnknownForTokenBeyondGrace() throws {
+        let (privateKey, publicKey) = makeKeys()
+        let hardwareId = MacHardwareIdentifier().identifier
+        let store = MockTokenStore()
+        let token = try signToken(
+            privateKey: privateKey, hardwareId: hardwareId, nonce: "stored",
+            exp: Date().addingTimeInterval(-10 * 24 * 3600) // expired beyond 7-day grace
+        )
+        try store.store(token)
+        
+        let client = try AmoreLicensing(
+            publicKey: publicKey.rawRepresentation.base64URLEncodedString(),
+            bundleIdentifier: bundleId,
+            server: unreachableServer(),
+            tokenStore: store
+        )
+        
+        #expect(client.status == .unknown)
+    }
+    
     @Test func validateValidStoredToken() async throws {
         let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()

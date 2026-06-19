@@ -151,8 +151,11 @@ public final class AmoreLicensing: Licensing {
             break
         case .decoded(let payload) where payload.exp > Date():
             status = .valid(License(from: payload))
-        case .decoded:
-            break
+        case .decoded(let payload):
+            // Expired, but maybe still within grace. Surface grace synchronously so
+            // an offline launch is authoritative; stay .unknown once grace has
+            // elapsed and let validate() ask the server, which may still renew it.
+            if let license = graceLicense(for: payload) { status = .gracePeriod(license) }
         }
     }
     
@@ -187,10 +190,21 @@ public final class AmoreLicensing: Licensing {
     /// Enters the grace period derived from an already-verified, expired payload,
     /// or invalidates once that grace period has elapsed.
     private func applyGracePeriod(payload: LicensePayload) {
+        if let license = graceLicense(for: payload) {
+            status = .gracePeriod(license)
+        } else {
+            status = .invalid
+        }
+    }
+    
+    /// The license a still-within-grace expired payload represents, with its
+    /// expiry extended to the grace deadline, or `nil` once grace has elapsed.
+    private func graceLicense(for payload: LicensePayload) -> License? {
         let graceEnd = payload.exp.addingTimeInterval(configuration.gracePeriod.timeInterval)
+        guard graceEnd >= .now else { return nil }
         var license = License(from: payload)
         license.expiresAt = graceEnd
-        status = graceEnd > Date() ? .gracePeriod(license) : .invalid
+        return license
     }
     
     private func mapClientErrors<T>(
