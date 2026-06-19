@@ -49,6 +49,13 @@ import Testing
         return (client, tokenStore, licenseClient)
     }
     
+    /// A server whose endpoints refuse instantly, so the `validate()` the launch
+    /// initializer spawns fails harmlessly instead of hitting the real backend.
+    private func unreachableServer() -> LicenseServer {
+        let url = URL(string: "http://127.0.0.1:1")!
+        return LicenseServer(activateURL: url, deactivateURL: url, validateURL: url)
+    }
+    
     // MARK: - Activation
     
     @Test func activationHardwareIdMismatch() async throws {
@@ -301,6 +308,32 @@ import Testing
         }
     }
     
+    /// The launch initializer must surface a stored, unexpired token as `.valid`
+    /// synchronously: the very first `status` read has to be authoritative before
+    /// the background `validate()` round-trip finishes. This is the path consumers
+    /// rely on at startup to gate access without awaiting the server.
+    @Test func launchInitializerSurfacesValidStoredTokenSynchronously() throws {
+        let (privateKey, publicKey) = makeKeys()
+        let hardwareId = MacHardwareIdentifier().identifier
+        let store = MockTokenStore()
+        let token = try signToken(privateKey: privateKey, hardwareId: hardwareId, nonce: "stored")
+        try store.store(token)
+        
+        let client = try AmoreLicensing(
+            publicKey: publicKey.rawRepresentation.base64URLEncodedString(),
+            bundleIdentifier: bundleId,
+            server: unreachableServer(),
+            tokenStore: store
+        )
+        
+        // No await between init and this read: the result must come from the
+        // synchronous local decode, not the async validate() the initializer spawns.
+        guard case .valid = client.status else {
+            Issue.record("Expected valid on first synchronous read, got \(client.status)")
+            return
+        }
+    }
+
     @Test func validateValidStoredToken() async throws {
         let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
