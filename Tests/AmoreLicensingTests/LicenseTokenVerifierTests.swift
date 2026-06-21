@@ -16,7 +16,7 @@ struct LicenseTokenVerifierTests {
     ) -> LicenseTokenVerifier {
         LicenseTokenVerifier(
             publicKey: publicKey ?? privateKey.publicKey,
-            hardwareIdentifier: MockHardwareIdentifier(identifier: hardwareId ?? self.hardwareId)
+            deviceIdentity: MockDeviceIdentity(identifier: hardwareId ?? self.hardwareId)
         )
     }
     

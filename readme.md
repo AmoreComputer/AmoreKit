@@ -1,10 +1,11 @@
 # AmoreKit
 
-A macOS JWT-based licensing SDK with offline-first validation and hardware ID binding for [amore.computer](https://amore.computer)
+A JWT-based licensing SDK with offline-first validation and device binding for [amore.computer](https://amore.computer)
 
 ## Requirements
 
-- macOS 14+
+- macOS 14+: uses the built-in device identity
+- Other platforms: provide a custom `DeviceIdentity`
 
 ## Installation
 

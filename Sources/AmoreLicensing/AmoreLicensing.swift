@@ -1,6 +1,7 @@
 import AmoreJWT
 import Crypto
 import Foundation
+import Observation
 
 /// Manages license activation, deactivation, and validation against an Amore licensing server.
 ///
@@ -9,28 +10,30 @@ import Foundation
 public final class AmoreLicensing: Licensing {
     /// The current validation status of the license.
     public private(set) var status: ValidationStatus = .unknown
-    
+
     private let bundleIdentifier: String
     private let configuration: LicensingConfiguration
-    private let hardwareIdentifier: HardwareIdentifier
+    private let deviceIdentity: any DeviceIdentity
     private let licenseClient: LicenseClient
     private let tokenStore: TokenStore
     private let verifier: LicenseTokenVerifier
     private var isValidating = false
-    
+
     /// Creates a new licensing instance.
     /// - Parameters:
     ///   - publicKey: The Ed25519 public key used to verify server responses.
     ///   - bundleIdentifier: The app's bundle identifier. Defaults to `Bundle.main.bundleIdentifier`.
     ///   - configuration: The licensing configuration. Defaults to ``LicensingConfiguration/default``.
     ///   - server: The license server to use. Defaults to the Amore server.
+    ///   - deviceIdentity: How this device is identified when binding a license. On macOS, use the initializer without this parameter to default to the built-in identifier.
     ///   - tokenStore: A custom store for persisting the license token. Defaults to a ``FileTokenStore`` in Application Support. Provide a custom ``TokenStore`` to store the token elsewhere.
     public init(
         publicKey: String,
         bundleIdentifier: String? = nil,
         configuration: LicensingConfiguration = .default,
         server: LicenseServer? = nil,
-        tokenStore: (any TokenStore)? = nil
+        deviceIdentity: (any DeviceIdentity),
+        tokenStore: (any TokenStore)? = nil,
     ) throws {
         let bundleIdentifier = bundleIdentifier ?? Bundle.main.bundleIdentifier ?? publicKey
         guard
@@ -39,35 +42,63 @@ public final class AmoreLicensing: Licensing {
         else {
             throw AmoreError.invalidPublicKey
         }
-        let hardwareIdentifier = MacHardwareIdentifier()
         self.configuration = configuration
         self.bundleIdentifier = bundleIdentifier
         self.tokenStore = tokenStore ?? FileTokenStore(bundleIdentifier: bundleIdentifier)
-        self.hardwareIdentifier = hardwareIdentifier
+        self.deviceIdentity = deviceIdentity
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(for: bundleIdentifier))
-        self.verifier = LicenseTokenVerifier(publicKey: signingKey, hardwareIdentifier: hardwareIdentifier)
+        self.verifier = LicenseTokenVerifier(publicKey: signingKey, deviceIdentity: deviceIdentity)
         if configuration.validationFrequency.shouldValidateAtLaunch {
             validateLocally()
             Task { [self] in try? await validate() }
         }
     }
-    
+
+#if os(macOS)
+    /// Creates a new licensing instance using the built-in macOS device identity.
+    ///
+    /// This is the recommended initializer on macOS. To control how the device is
+    /// identified, use the initializer that takes a `deviceIdentity` instead.
+    /// - Parameters:
+    ///   - publicKey: The Ed25519 public key used to verify server responses.
+    ///   - bundleIdentifier: The app's bundle identifier. Defaults to `Bundle.main.bundleIdentifier`.
+    ///   - configuration: The licensing configuration. Defaults to ``LicensingConfiguration/default``.
+    ///   - server: The license server to use. Defaults to the Amore server.
+    ///   - tokenStore: A custom store for persisting the license token. Defaults to a ``FileTokenStore`` in Application Support. Provide a custom ``TokenStore`` to store the token elsewhere.
+    public convenience init(
+        publicKey: String,
+        bundleIdentifier: String? = nil,
+        configuration: LicensingConfiguration = .default,
+        server: LicenseServer? = nil,
+        tokenStore: (any TokenStore)? = nil,
+    ) throws {
+        try self.init(
+            publicKey: publicKey,
+            bundleIdentifier: bundleIdentifier,
+            configuration: configuration,
+            server: server,
+            deviceIdentity: MacDeviceIdentity(),
+            tokenStore: tokenStore
+        )
+    }
+#endif
+
     internal init(
         publicKey: Curve25519.Signing.PublicKey,
         bundleIdentifier: String,
         configuration: LicensingConfiguration = .default,
         tokenStore: TokenStore,
-        hardwareIdentifier: HardwareIdentifier,
+        deviceIdentity: any DeviceIdentity,
         licenseClient: LicenseClient
     ) {
         self.configuration = configuration
         self.bundleIdentifier = bundleIdentifier
         self.tokenStore = tokenStore
-        self.hardwareIdentifier = hardwareIdentifier
+        self.deviceIdentity = deviceIdentity
         self.licenseClient = licenseClient
-        self.verifier = LicenseTokenVerifier(publicKey: publicKey, hardwareIdentifier: hardwareIdentifier)
+        self.verifier = LicenseTokenVerifier(publicKey: publicKey, deviceIdentity: deviceIdentity)
     }
-    
+
     /// Activates a license on this device using the given license key.
     /// - Parameter licenseKey: The license key to activate.
     /// - Throws: ``AmoreError`` if activation fails.
@@ -75,15 +106,15 @@ public final class AmoreLicensing: Licensing {
         let nonce = UUID().uuidString
         let token = try await mapClientErrors {
             try await self.licenseClient.activate(
-                licenseKey: licenseKey, hardwareId: self.hardwareIdentifier.identifier, nonce: nonce,
-                name: Host.current().localizedName
+                licenseKey: licenseKey, hardwareId: self.deviceIdentity.identifier, nonce: nonce,
+                name: self.deviceIdentity.deviceName
             )
         }
         let payload = try verifier.decode(token, expectedNonce: nonce)
         do { try tokenStore.store(token) } catch { throw .tokenStore(error) }
         status = .valid(License(from: payload))
     }
-    
+
     /// Deactivates the current license on this device.
     /// - Throws: ``AmoreError`` if deactivation fails.
     public func deactivate() async throws(AmoreError) {
@@ -96,7 +127,7 @@ public final class AmoreLicensing: Licensing {
         do { try tokenStore.delete() } catch { throw .tokenStore(error) }
         status = .unknown
     }
-    
+
     /// Validates the stored license token and updates ``status``.
     ///
     /// The token is verified locally (signature, expiry, hardware ID). If it is
@@ -116,14 +147,14 @@ public final class AmoreLicensing: Licensing {
         guard !isValidating else { return status }
         isValidating = true
         defer { isValidating = false }
-        
+
         let stored: String?
         do { stored = try tokenStore.retrieve() } catch { throw .tokenStore(error) }
         guard let token = stored else {
             status = .unknown
             throw .noStoredToken
         }
-        
+
         switch verifier.decodeLocally(token) {
         case .hardwareMismatch:
             status = .invalid
@@ -139,9 +170,9 @@ public final class AmoreLicensing: Licensing {
         }
         return status
     }
-    
+
     // MARK: - Private
-    
+
     private func validateLocally() {
         guard let token = try? tokenStore.retrieve() else { return }
         switch verifier.decodeLocally(token) {
@@ -158,7 +189,7 @@ public final class AmoreLicensing: Licensing {
             if let license = graceLicense(for: payload) { status = .gracePeriod(license) }
         }
     }
-    
+
     /// Refreshes the token from the server and updates ``status``. On a transient
     /// failure it keeps `localPayload` while still valid, falls back to the grace
     /// period once it has expired, and invalidates when there is nothing to fall
@@ -186,7 +217,7 @@ public final class AmoreLicensing: Licensing {
             status = .valid(License(from: localPayload))
         }
     }
-    
+
     /// Enters the grace period derived from an already-verified, expired payload,
     /// or invalidates once that grace period has elapsed.
     private func applyGracePeriod(payload: LicensePayload) {
@@ -196,7 +227,7 @@ public final class AmoreLicensing: Licensing {
             status = .invalid
         }
     }
-    
+
     /// The license a still-within-grace expired payload represents, with its
     /// expiry extended to the grace deadline, or `nil` once grace has elapsed.
     private func graceLicense(for payload: LicensePayload) -> License? {
@@ -206,7 +237,7 @@ public final class AmoreLicensing: Licensing {
         license.expiresAt = graceEnd
         return license
     }
-    
+
     private func mapClientErrors<T>(
         _ operation: @MainActor @Sendable () async throws -> T
     ) async throws(AmoreError) -> T {
@@ -222,5 +253,5 @@ public final class AmoreLicensing: Licensing {
             throw .network(.requestFailed(error.localizedDescription))
         }
     }
-    
+
 }

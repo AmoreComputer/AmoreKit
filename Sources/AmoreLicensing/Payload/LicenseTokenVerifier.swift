@@ -3,7 +3,7 @@ import Crypto
 import Foundation
 
 /// Verifies signed license tokens against the app's public key and this device's
-/// hardware identifier.
+/// identity.
 ///
 /// Pure and stateless: it performs no I/O and holds no mutable state, so the
 /// signature, nonce, hardware, and expiry checks can be exercised in isolation.
@@ -17,7 +17,7 @@ struct LicenseTokenVerifier: Sendable {
     }
     
     let publicKey: Curve25519.Signing.PublicKey
-    let hardwareIdentifier: HardwareIdentifier
+    let deviceIdentity: any DeviceIdentity
     
     /// Verifies a token's signature and claims and returns its payload.
     /// - Parameters:
@@ -40,7 +40,7 @@ struct LicenseTokenVerifier: Sendable {
             throw .invalidToken
         }
         if let expectedNonce, payload.nonce != expectedNonce { throw .nonceMismatch }
-        guard payload.hardwareId == hardwareIdentifier.identifier else { throw .hardwareIdMismatch }
+        guard payload.hardwareId == deviceIdentity.identifier else { throw .hardwareIdMismatch }
         return payload
     }
     

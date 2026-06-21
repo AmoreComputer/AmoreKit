@@ -5,7 +5,7 @@ import Testing
 
 @testable import AmoreLicensing
 
-/// Exercises the public ``AmoreLicensing/init(publicKey:bundleIdentifier:configuration:server:tokenStore:)``
+/// Exercises the public ``AmoreLicensing/init(publicKey:bundleIdentifier:configuration:server:deviceIdentity:tokenStore:)``
 /// string-to-key path: the one place a deployed app's hardcoded key string is
 /// ingested. ``ValidationFrequency/manual`` keeps the initializer side-effect
 /// free (no launch validation, no network).
@@ -21,6 +21,7 @@ struct PublicKeyIngestionTests {
             publicKey: keyString,
             bundleIdentifier: "com.test.amorekit",
             configuration: manual,
+            deviceIdentity: MockDeviceIdentity(identifier: "TEST-DEVICE"),
             tokenStore: MockTokenStore()
         )
     }
@@ -31,6 +32,7 @@ struct PublicKeyIngestionTests {
                 publicKey: "not base64 !!!",
                 bundleIdentifier: "com.test.amorekit",
                 configuration: manual,
+                deviceIdentity: MockDeviceIdentity(identifier: "TEST-DEVICE"),
                 tokenStore: MockTokenStore()
             )
         }
@@ -43,6 +45,7 @@ struct PublicKeyIngestionTests {
                 publicKey: tooShort,
                 bundleIdentifier: "com.test.amorekit",
                 configuration: manual,
+                deviceIdentity: MockDeviceIdentity(identifier: "TEST-DEVICE"),
                 tokenStore: MockTokenStore()
             )
         }

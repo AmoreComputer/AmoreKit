@@ -4,21 +4,25 @@ final class MockLicenseClient: LicenseClient, @unchecked Sendable {
     var onActivate: ((String, String, String) async throws -> String)?
     var onDeactivate: ((String) async throws -> Void)?
     var onValidate: ((String, String) async throws -> String)?
-
+    
+    /// The `name` passed to the most recent `activate` call.
+    private(set) var lastActivateName: String?
+    
     func activate(licenseKey: String, hardwareId: String, nonce: String, name: String?) async throws -> String {
+        lastActivateName = name
         guard let handler = onActivate else {
             throw AmoreError.client(.licensingNotConfigured)
         }
         return try await handler(licenseKey, hardwareId, nonce)
     }
-
+    
     func deactivate(token: String) async throws {
         guard let handler = onDeactivate else {
             throw AmoreError.client(.licensingNotConfigured)
         }
         try await handler(token)
     }
-
+    
     func validate(token: String, nonce: String) async throws -> String {
         guard let handler = onValidate else {
             throw AmoreError.client(.licensingNotConfigured)

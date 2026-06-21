@@ -1,6 +1,6 @@
 # ``AmoreLicensing``
 
-A macOS licensing SDK for license activation, validation, and deactivation.
+A licensing SDK for license activation, validation, and deactivation.
 
 ## Overview
 
@@ -15,6 +15,7 @@ AmoreLicensing provides an `@Observable` class that manages the full license lif
 ### Articles
 
 - <doc:Getting-Started>
+- <doc:Custom-Device-Identity>
 - <doc:Architecture-&-Security>
 
 ### Essentials
@@ -36,6 +37,10 @@ AmoreLicensing provides an `@Observable` class that manages the full license lif
 
 - ``TokenStore``
 - ``FileTokenStore``
+
+### Device Identity
+
+- ``DeviceIdentity``
 
 ### Errors
 

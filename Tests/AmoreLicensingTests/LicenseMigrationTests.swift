@@ -23,7 +23,7 @@ import Testing
             publicKey: publicKey,
             bundleIdentifier: bundleId,
             tokenStore: tokenStore,
-            hardwareIdentifier: MockHardwareIdentifier(identifier: hardwareId),
+            deviceIdentity: MockDeviceIdentity(identifier: hardwareId),
             licenseClient: licenseClient
         )
     }

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 struct HTTPLicenseClient: LicenseClient {
     private let server: LicenseServer

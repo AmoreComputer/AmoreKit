@@ -14,7 +14,7 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
 
 1. User enters license key in app
 2. Client generates:
-   - Hardware ID (IOPlatformSerialNumber or similar)
+   - Device ID from ``DeviceIdentity`` (the built-in macOS identity uses IOPlatformSerialNumber)
    - Random nonce (UUID)
 3. Client sends HTTPS POST to server:
    { license_key, hardware_id, nonce }
@@ -30,7 +30,7 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
    - JWT signature valid (using server's public key)
    - Nonce matches what client sent
    - JWT not expired
-1. Client stores JWT in macOS file system
+1. Client stores JWT in the file system
 
 ### Ongoing Validation (offline-first)
 
