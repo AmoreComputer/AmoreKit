@@ -314,7 +314,6 @@ import Testing
     /// rely on at startup to gate access without awaiting the server.
     @Test func launchInitializerSurfacesValidStoredTokenSynchronously() throws {
         let (privateKey, publicKey) = makeKeys()
-        let hardwareId = MacDeviceIdentity().identifier
         let store = MockTokenStore()
         let token = try signToken(privateKey: privateKey, hardwareId: hardwareId, nonce: "stored")
         try store.store(token)
@@ -323,6 +322,7 @@ import Testing
             publicKey: publicKey.rawRepresentation.base64URLEncodedString(),
             bundleIdentifier: bundleId,
             server: unreachableServer(),
+            deviceIdentity: MockDeviceIdentity(identifier: hardwareId),
             tokenStore: store
         )
         
@@ -339,7 +339,6 @@ import Testing
     /// refresh fails and applies grace.
     @Test func launchInitializerSurfacesGracePeriodForTokenWithinGraceSynchronously() throws {
         let (privateKey, publicKey) = makeKeys()
-        let hardwareId = MacDeviceIdentity().identifier
         let store = MockTokenStore()
         let expDate = Date().addingTimeInterval(-2 * 24 * 3600) // expired 2 days ago
         let token = try signToken(
@@ -351,6 +350,7 @@ import Testing
             publicKey: publicKey.rawRepresentation.base64URLEncodedString(),
             bundleIdentifier: bundleId,
             server: unreachableServer(),
+            deviceIdentity: MockDeviceIdentity(identifier: hardwareId),
             tokenStore: store
         )
         
@@ -367,7 +367,6 @@ import Testing
     /// async `validate()` makes that call.
     @Test func launchInitializerStaysUnknownForTokenBeyondGrace() throws {
         let (privateKey, publicKey) = makeKeys()
-        let hardwareId = MacDeviceIdentity().identifier
         let store = MockTokenStore()
         let token = try signToken(
             privateKey: privateKey, hardwareId: hardwareId, nonce: "stored",
@@ -379,6 +378,7 @@ import Testing
             publicKey: publicKey.rawRepresentation.base64URLEncodedString(),
             bundleIdentifier: bundleId,
             server: unreachableServer(),
+            deviceIdentity: MockDeviceIdentity(identifier: hardwareId),
             tokenStore: store
         )
         
