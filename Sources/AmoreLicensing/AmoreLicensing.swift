@@ -227,15 +227,13 @@ public final class AmoreLicensing: Licensing {
             status = .invalid
         }
     }
-
-    /// The license a still-within-grace expired payload represents, with its
-    /// expiry extended to the grace deadline, or `nil` once grace has elapsed.
+    
+    /// The license a still-within-grace expired payload represents, or `nil` once
+    /// the grace period has elapsed.
     private func graceLicense(for payload: LicensePayload) -> License? {
         let graceEnd = payload.exp.addingTimeInterval(configuration.gracePeriod.timeInterval)
         guard graceEnd >= .now else { return nil }
-        var license = License(from: payload)
-        license.expiresAt = graceEnd
-        return license
+        return License(from: payload)
     }
 
     private func mapClientErrors<T>(
