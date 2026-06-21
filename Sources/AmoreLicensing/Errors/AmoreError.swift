@@ -6,8 +6,11 @@ public enum AmoreError: LocalizedError, Equatable, Sendable {
     case client(ClientError)
     /// The license token's hardware ID does not match this device.
     case hardwareIdMismatch
-    /// The server response has an invalid cryptographic signature.
-    case invalidSignature
+    /// The configured public key is not a valid Ed25519 key.
+    case invalidPublicKey
+    /// The server response could not be verified (bad signature, malformed,
+    /// expired on arrival, or otherwise unparseable).
+    case invalidToken
     /// A token store operation failed.
     case tokenStore(TokenStoreError)
     /// A network request failed.
@@ -23,8 +26,10 @@ public enum AmoreError: LocalizedError, Equatable, Sendable {
             return error.localizedDescription
         case .hardwareIdMismatch:
             return "This license is registered to a different device."
-        case .invalidSignature:
-            return "The server response has an invalid signature."
+        case .invalidPublicKey:
+            return "The configured public key is invalid."
+        case .invalidToken:
+            return "The server response could not be verified."
         case .tokenStore(let error):
             return error.localizedDescription
         case .network(let error):

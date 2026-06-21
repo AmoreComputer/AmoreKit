@@ -1,6 +1,5 @@
 @testable import AmoreLicensing
 import Foundation
-import JWTKit
 import Testing
 
 @Suite("LicensePayload decode")

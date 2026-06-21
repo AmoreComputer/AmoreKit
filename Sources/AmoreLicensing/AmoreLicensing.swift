@@ -1,5 +1,6 @@
+import AmoreJWT
+import Crypto
 import Foundation
-import JWTKit
 
 /// Manages license activation, deactivation, and validation against an Amore licensing server.
 ///
@@ -12,12 +13,10 @@ public final class AmoreLicensing: Licensing {
     private let bundleIdentifier: String
     private let configuration: LicensingConfiguration
     private let hardwareIdentifier: HardwareIdentifier
-    private let jwtCollection = JWTKeyCollection()
     private let licenseClient: LicenseClient
-    private let publicKey: EdDSA.PublicKey
     private let tokenStore: TokenStore
+    private let verifier: LicenseTokenVerifier
     private var isValidating = false
-    private var keysReady = false
     
     /// Creates a new licensing instance.
     /// - Parameters:
@@ -34,19 +33,27 @@ public final class AmoreLicensing: Licensing {
         tokenStore: (any TokenStore)? = nil
     ) throws {
         let bundleIdentifier = bundleIdentifier ?? Bundle.main.bundleIdentifier ?? publicKey
+        guard
+            let keyData = publicKey.base64URLDecodedData(),
+            let signingKey = try? Curve25519.Signing.PublicKey(rawRepresentation: keyData)
+        else {
+            throw AmoreError.invalidPublicKey
+        }
+        let hardwareIdentifier = MacHardwareIdentifier()
         self.configuration = configuration
-        self.publicKey = try EdDSA.PublicKey(x: publicKey, curve: .ed25519)
         self.bundleIdentifier = bundleIdentifier
         self.tokenStore = tokenStore ?? FileTokenStore(bundleIdentifier: bundleIdentifier)
-        self.hardwareIdentifier = MacHardwareIdentifier()
+        self.hardwareIdentifier = hardwareIdentifier
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(for: bundleIdentifier))
+        self.verifier = LicenseTokenVerifier(publicKey: signingKey, hardwareIdentifier: hardwareIdentifier)
         if configuration.validationFrequency.shouldValidateAtLaunch {
+            validateLocally()
             Task { [self] in try? await validate() }
         }
     }
     
     internal init(
-        publicKey: EdDSA.PublicKey,
+        publicKey: Curve25519.Signing.PublicKey,
         bundleIdentifier: String,
         configuration: LicensingConfiguration = .default,
         tokenStore: TokenStore,
@@ -54,11 +61,11 @@ public final class AmoreLicensing: Licensing {
         licenseClient: LicenseClient
     ) {
         self.configuration = configuration
-        self.publicKey = publicKey
         self.bundleIdentifier = bundleIdentifier
         self.tokenStore = tokenStore
         self.hardwareIdentifier = hardwareIdentifier
         self.licenseClient = licenseClient
+        self.verifier = LicenseTokenVerifier(publicKey: publicKey, hardwareIdentifier: hardwareIdentifier)
     }
     
     /// Activates a license on this device using the given license key.
@@ -72,7 +79,7 @@ public final class AmoreLicensing: Licensing {
                 name: Host.current().localizedName
             )
         }
-        let payload = try await verifyToken(token, expectedNonce: nonce)
+        let payload = try verifier.decode(token, expectedNonce: nonce)
         do { try tokenStore.store(token) } catch { throw .tokenStore(error) }
         status = .valid(License(from: payload))
     }
@@ -117,81 +124,87 @@ public final class AmoreLicensing: Licensing {
             throw .noStoredToken
         }
         
-        await ensureKeysConfigured()
-        
-        let result: ValidationStatus
-        do {
-            let payload = try await jwtCollection.verify(token, as: LicensePayload.self)
-            guard payload.hardwareId == hardwareIdentifier.identifier else {
-                status = .invalid
-                throw AmoreError.hardwareIdMismatch
-            }
-            if configuration.validationFrequency.isRefreshDue(issuedAt: payload.iat.value) {
-                result = try await refreshToken(token, currentPayload: payload)
+        switch verifier.decodeLocally(token) {
+        case .hardwareMismatch:
+            status = .invalid
+            throw AmoreError.hardwareIdMismatch
+        case .unverifiable:
+            try await refreshToken(token)
+        case .decoded(let payload):
+            if payload.exp < Date() || configuration.validationFrequency.isRefreshDue(issuedAt: payload.iat) {
+                try await refreshToken(token, localPayload: payload)
             } else {
                 status = .valid(License(from: payload))
-                result = status
             }
-        } catch let error as AmoreError {
-            throw error
-        } catch {
-            // Token expired or invalid signature — try refresh
-            result = try await refreshToken(token)
         }
-        
-        return result
+        return status
     }
     
     // MARK: - Private
     
+    private func validateLocally() {
+        guard let token = try? tokenStore.retrieve() else { return }
+        switch verifier.decodeLocally(token) {
+        case .hardwareMismatch:
+            status = .invalid
+        case .unverifiable:
+            break
+        case .decoded(let payload) where payload.exp > Date():
+            status = .valid(License(from: payload))
+        case .decoded(let payload):
+            // Expired, but maybe still within grace. Surface grace synchronously so
+            // an offline launch is authoritative; stay .unknown once grace has
+            // elapsed and let validate() ask the server, which may still renew it.
+            if let license = graceLicense(for: payload) { status = .gracePeriod(license) }
+        }
+    }
+    
+    /// Refreshes the token from the server and updates ``status``. On a transient
+    /// failure it keeps `localPayload` while still valid, falls back to the grace
+    /// period once it has expired, and invalidates when there is nothing to fall
+    /// back on; a ``ClientError`` always invalidates the license.
     private func refreshToken(
         _ token: String,
-        currentPayload: LicensePayload? = nil
-    ) async throws(AmoreError) -> ValidationStatus {
+        localPayload: LicensePayload? = nil
+    ) async throws(AmoreError) {
         let nonce = UUID().uuidString
         do {
             let newToken = try await licenseClient.validate(token: token, nonce: nonce)
-            let payload = try await verifyToken(newToken, expectedNonce: nonce)
+            let payload = try verifier.decode(newToken, expectedNonce: nonce)
             do { try tokenStore.store(newToken) } catch { throw AmoreError.tokenStore(error) }
             status = .valid(License(from: payload))
-            return status
         } catch let error as ClientError {
             status = .invalid
             throw .client(error)
         } catch let error as AmoreError {
-            if let currentPayload {
-                status = .valid(License(from: currentPayload))
-                return status
-            }
-            throw error
+            guard let localPayload, localPayload.exp > Date() else { throw error }
+            status = .valid(License(from: localPayload))
         } catch {
-            if let currentPayload {
-                // Token still valid locally, keep using it
-                status = .valid(License(from: currentPayload))
-                return status
-            }
-            return await applyGracePeriod(token: token)
+            guard let localPayload else { status = .invalid; return }
+            guard localPayload.exp > Date() else { applyGracePeriod(payload: localPayload); return }
+            // Token still valid locally, keep using it.
+            status = .valid(License(from: localPayload))
         }
     }
     
-    private func applyGracePeriod(token: String) async -> ValidationStatus {
-        await ensureKeysConfigured()
-        guard let payload = try? await jwtCollection.verify(token, as: GracePeriodPayload.self) else {
-            status = .invalid
-            return .invalid
-        }
-        
-        let graceEnd = payload.exp.value.addingTimeInterval(configuration.gracePeriod.timeInterval)
-        var license = License(from: payload)
-        license.expiresAt = graceEnd
-        
-        if graceEnd > Date() {
+    /// Enters the grace period derived from an already-verified, expired payload,
+    /// or invalidates once that grace period has elapsed.
+    private func applyGracePeriod(payload: LicensePayload) {
+        if let license = graceLicense(for: payload) {
             status = .gracePeriod(license)
-            return status
         } else {
             status = .invalid
-            return .invalid
         }
+    }
+    
+    /// The license a still-within-grace expired payload represents, with its
+    /// expiry extended to the grace deadline, or `nil` once grace has elapsed.
+    private func graceLicense(for payload: LicensePayload) -> License? {
+        let graceEnd = payload.exp.addingTimeInterval(configuration.gracePeriod.timeInterval)
+        guard graceEnd >= .now else { return nil }
+        var license = License(from: payload)
+        license.expiresAt = graceEnd
+        return license
     }
     
     private func mapClientErrors<T>(
@@ -210,23 +223,4 @@ public final class AmoreLicensing: Licensing {
         }
     }
     
-    @discardableResult
-    private func verifyToken(_ token: String, expectedNonce: String) async throws(AmoreError) -> LicensePayload {
-        await ensureKeysConfigured()
-        let payload: LicensePayload
-        do {
-            payload = try await jwtCollection.verify(token, as: LicensePayload.self)
-        } catch {
-            throw .invalidSignature
-        }
-        guard payload.nonce == expectedNonce else { throw .nonceMismatch }
-        guard payload.hardwareId == hardwareIdentifier.identifier else { throw .hardwareIdMismatch }
-        return payload
-    }
-    
-    private func ensureKeysConfigured() async {
-        guard !keysReady else { return }
-        await jwtCollection.add(eddsa: publicKey)
-        keysReady = true
-    }
 }
