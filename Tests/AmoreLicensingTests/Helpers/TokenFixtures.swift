@@ -1,5 +1,6 @@
+import AmoreJWT
+import Crypto
 import Foundation
-import JWTKit
 
 @testable import AmoreLicensing
 
@@ -14,37 +15,36 @@ extension Product {
 
 /// Signs a production (v2) token carrying an object `product` claim.
 func signV2Token(
-    privateKey: EdDSA.PrivateKey,
+    privateKey: Curve25519.Signing.PrivateKey,
     hardwareId: String,
     nonce: String,
     product: Product = .testSample,
     exp: Date = Date().addingTimeInterval(30 * 24 * 3600),
     iat: Date = Date(),
     licenseId: UUID = UUID()
-) async throws -> String {
+) throws -> String {
     let payload = LicensePayload(
-        exp: .init(value: exp),
+        exp: exp,
         hardwareId: hardwareId,
-        iat: .init(value: iat),
+        iat: iat,
         licenseId: licenseId,
         nonce: nonce,
         product: product
     )
-    let keys = await JWTKeyCollection().add(eddsa: privateKey)
-    return try await keys.sign(payload)
+    return try EdDSAJWT.sign(payload, using: privateKey)
 }
 
 /// Test-only mirror of the pre-v2 payload: `product` is a bare string, with the
 /// same JSON coding keys the old SDK shipped. Used to mint "old" cached tokens.
-struct LicensePayloadV1Fixture: JWTPayload {
-    var exp: ExpirationClaim
+struct LicensePayloadV1Fixture: Encodable {
+    var exp: Date
     var hardwareId: String
-    var iat: IssuedAtClaim
+    var iat: Date
     var licenseId: UUID
     var nonce: String
     var product: String
     var entitlements: Set<License.Entitlement> = []
-
+    
     enum CodingKeys: String, CodingKey {
         case exp
         case hardwareId = "hardware_id"
@@ -54,28 +54,25 @@ struct LicensePayloadV1Fixture: JWTPayload {
         case product
         case entitlements
     }
-
-    func verify(using algorithm: some JWTAlgorithm) throws {}
 }
 
 /// Signs an "old" (v1) token carrying a bare-string `product` claim.
 func signV1Token(
-    privateKey: EdDSA.PrivateKey,
+    privateKey: Curve25519.Signing.PrivateKey,
     hardwareId: String,
     nonce: String,
     productName: String = "Amore",
     exp: Date = Date().addingTimeInterval(30 * 24 * 3600),
     iat: Date = Date(),
     licenseId: UUID = UUID()
-) async throws -> String {
+) throws -> String {
     let payload = LicensePayloadV1Fixture(
-        exp: .init(value: exp),
+        exp: exp,
         hardwareId: hardwareId,
-        iat: .init(value: iat),
+        iat: iat,
         licenseId: licenseId,
         nonce: nonce,
         product: productName
     )
-    let keys = await JWTKeyCollection().add(eddsa: privateKey)
-    return try await keys.sign(payload)
+    return try EdDSAJWT.sign(payload, using: privateKey)
 }

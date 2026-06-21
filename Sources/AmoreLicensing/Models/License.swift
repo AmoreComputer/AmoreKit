@@ -16,7 +16,7 @@ public struct License: Identifiable, Hashable, Codable, Sendable {
     /// The customer this license was issued to, or `nil` if the license has no
     /// associated customer. Use `customer?.email` to show "Licensed to <email>".
     public var customer: Customer?
-
+    
     /// The product name this license is for.
     @available(*, deprecated, renamed: "product.name", message: "Use `product.name` instead.")
     public var name: String { product.name }
@@ -24,11 +24,11 @@ public struct License: Identifiable, Hashable, Codable, Sendable {
 
 extension License {
     
-    init(from payload: some LicensePayloadProtocol) {
+    init(from payload: LicensePayload) {
         self = License(
             id: payload.licenseId,
             product: payload.product,
-            expiresAt: payload.exp.value,
+            expiresAt: payload.exp,
             entitlements: payload.entitlements,
             subscriptionState: payload.subscriptionState,
             customer: payload.customer

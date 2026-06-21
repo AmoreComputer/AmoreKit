@@ -14,8 +14,22 @@ var products: [Product] = [
 
 var targets: [Target] = [
     .target(
+        name: "AmoreJWT",
+        dependencies: [
+            .product(name: "Crypto", package: "swift-crypto"),
+        ]
+    ),
+    .target(
         name: "AmoreLicensing",
         dependencies: [
+            "AmoreJWT",
+            .product(name: "Crypto", package: "swift-crypto"),
+        ]
+    ),
+    .testTarget(
+        name: "AmoreJWTTests",
+        dependencies: [
+            "AmoreJWT",
             .product(name: "JWTKit", package: "jwt-kit"),
         ]
     ),
@@ -23,6 +37,7 @@ var targets: [Target] = [
         name: "AmoreLicensingTests",
         dependencies: [
             "AmoreLicensing",
+            "AmoreJWT",
             .product(name: "JWTKit", package: "jwt-kit"),
         ]
     ),
@@ -51,6 +66,7 @@ let package = Package(
     ],
     products: products,
     dependencies: [
+        .package(url: "https://github.com/apple/swift-crypto.git", "3.8.0"..<"5.0.0"),
         .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.1.0"),
     ],
