@@ -49,6 +49,8 @@ On macOS you can use this initializer too, to override the built-in identity.
 - **Stable**: constant for the lifetime of the install. If it changes, the bound license stops validating and the user has to re-activate.
 - **Unique**: distinct per device, so a license cannot be shared across machines.
 
+Return the raw value; hashing is not your job. AmoreLicensing hashes the identifier, salted with the app's bundle identifier, before it leaves the device, so the raw value is never sent to the server and the same device produces a different ID in every app.
+
 On Linux, for example, you might read `/etc/machine-id`:
 
 ```swift

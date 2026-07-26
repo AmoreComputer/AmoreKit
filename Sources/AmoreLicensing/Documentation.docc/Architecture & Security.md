@@ -14,7 +14,7 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
 
 1. User enters license key in app
 2. Client generates:
-   - Device ID from ``DeviceIdentity`` (the built-in macOS identity uses IOPlatformSerialNumber)
+   - Hardware ID: a salted hash of this device's identifier (see Device Identifier Privacy)
    - Random nonce (UUID)
 3. Client sends HTTPS POST to server:
    { license_key, hardware_id, nonce }
@@ -30,7 +30,7 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
    - JWT signature valid (using server's public key)
    - Nonce matches what client sent
    - JWT not expired
-1. Client stores JWT in the file system
+9. Client stores JWT in the file system
 
 ### Ongoing Validation (offline-first)
 
@@ -70,10 +70,16 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
 - Works without network until JWT expires
 
 ### Hardware Binding
-- License tied to specific device via hardware ID
-- JWT contains hardware ID (signed by server)
-- Client verifies hardware ID on each validation
+- License tied to a specific device via its hardware ID
+- JWT contains the hardware ID (signed by server)
+- Client verifies the JWT's hardware ID against this device on each validation
 - Prevents JWT theft/sharing between devices
+
+### Device Identifier Privacy
+- The hardware ID is not the raw device identifier: it is an HMAC-SHA256 of it, keyed with the app's bundle identifier and prefixed `h1:`
+- The raw device identifier (the built-in macOS ``DeviceIdentity`` reads IOPlatformSerialNumber) never leaves the device
+- The bundle identifier salt makes the same device pseudonymous per app, so the server cannot correlate a device across apps
+- Hashing defeats enumeration and leakage of device identifiers, not targeted confirmation: the salt is public, so a candidate identifier can be checked for a match
 
 ### Grace Period
 - App continues working N days after last successful validation

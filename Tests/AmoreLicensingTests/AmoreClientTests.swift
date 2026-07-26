@@ -57,7 +57,21 @@ import Testing
     }
     
     // MARK: - Activation
-    
+
+    @Test func activationSendsHashedHardwareId() async throws {
+        let (privateKey, publicKey) = makeKeys()
+        let mock = MockLicenseClient()
+        mock.onActivate = { _, hwId, nonce in
+            try self.signToken(privateKey: privateKey, hardwareId: hwId, nonce: nonce)
+        }
+        let (client, _, _) = makeClient(publicKey: publicKey, licenseClient: mock)
+
+        try await client.activate(licenseKey: "KEY")
+
+        let expected = MockDeviceIdentity(identifier: hardwareId).hashedIdentifier(salt: bundleId)
+        #expect(mock.lastActivateHardwareId == expected)
+    }
+
     @Test func activationHardwareIdMismatch() async throws {
         let (privateKey, publicKey) = makeKeys()
         let mock = MockLicenseClient()
@@ -386,12 +400,31 @@ import Testing
     @Test func validateValidStoredToken() async throws {
         let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
+        let hashed = MockDeviceIdentity(identifier: hardwareId).hashedIdentifier(salt: bundleId)
+        let token = try signToken(privateKey: privateKey, hardwareId: hashed, nonce: "stored")
+        try store.store(token)
+        let (client, _, _) = makeClient(publicKey: publicKey, tokenStore: store)
+
+        let result = try await client.validate()
+
+        guard case .valid = result, case .valid = client.status else {
+            Issue.record("Expected valid, got \(result)")
+            return
+        }
+    }
+
+    /// A token stored before the SDK hashed identifiers carries the raw value;
+    /// it must keep validating so existing installs stay valid without
+    /// re-activation.
+    @Test func validateValidStoredTokenWithLegacyRawHardwareId() async throws {
+        let (privateKey, publicKey) = makeKeys()
+        let store = MockTokenStore()
         let token = try signToken(privateKey: privateKey, hardwareId: hardwareId, nonce: "stored")
         try store.store(token)
         let (client, _, _) = makeClient(publicKey: publicKey, tokenStore: store)
-        
+
         let result = try await client.validate()
-        
+
         guard case .valid = result, case .valid = client.status else {
             Issue.record("Expected valid, got \(result)")
             return
