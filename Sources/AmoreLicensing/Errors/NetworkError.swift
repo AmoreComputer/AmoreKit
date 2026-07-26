@@ -1,7 +1,7 @@
 import Foundation
 
 /// An error indicating a network request to the licensing server failed.
-public enum NetworkError: LocalizedError, Equatable, Sendable {
+public enum NetworkError: LocalizedError, Hashable, Sendable {
     case rateLimited
     case requestFailed(String)
     

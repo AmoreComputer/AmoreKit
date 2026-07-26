@@ -1,7 +1,7 @@
 import Foundation
 
 /// Errors returned by the licensing server.
-public enum ClientError: String, LocalizedError, Sendable, Decodable {
+public enum ClientError: String, LocalizedError, Sendable, Hashable, Decodable {
     case activationNotFound
     case appNotFound
     case deviceLimitReached

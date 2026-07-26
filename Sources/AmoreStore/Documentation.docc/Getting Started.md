@@ -54,7 +54,19 @@ Use ``Price/recurringInterval`` to tell one-time purchases from subscriptions.
 
 ## Checkout
 
-Every purchasable ``Product`` carries a ``Product/checkoutURL``. Open it to send the customer to Stripe checkout.
+Prefer the `AmoreCheckout` module: one view modifier presents Stripe checkout
+in-app and activates the purchased license automatically.
+
+```swift
+@State private var buying: Product?
+
+Button("Buy Pro") { buying = product }
+    .amoreCheckout(item: $buying, checkout: checkout)
+```
+
+Alternatively, every purchasable ``Product`` carries a ``Product/checkoutURL``
+you can open in the browser for the classic flow (pay, receive the key by
+email, enter it in the app):
 
 ```swift
 NSWorkspace.shared.open(product.checkoutURL)
