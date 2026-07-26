@@ -18,6 +18,8 @@ struct LicenseTokenVerifier: Sendable {
     
     let publicKey: Curve25519.Signing.PublicKey
     let deviceIdentity: any DeviceIdentity
+    /// Salt for the hashed device identifier, the app's bundle identifier.
+    let salt: String
     
     /// Verifies a token's signature and claims and returns its payload.
     /// - Parameters:
@@ -40,7 +42,11 @@ struct LicenseTokenVerifier: Sendable {
             throw .invalidToken
         }
         if let expectedNonce, payload.nonce != expectedNonce { throw .nonceMismatch }
-        guard payload.hardwareId == deviceIdentity.identifier else { throw .hardwareIdMismatch }
+        // Tokens issued before the SDK hashed identifiers carry the raw value;
+        // accepting it keeps existing installs valid without re-activation.
+        guard payload.hardwareId == deviceIdentity.hashedIdentifier(salt: salt)
+           || payload.hardwareId == deviceIdentity.identifier
+        else { throw .hardwareIdMismatch }
         return payload
     }
     

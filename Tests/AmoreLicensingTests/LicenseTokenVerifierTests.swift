@@ -9,20 +9,25 @@ import Testing
 struct LicenseTokenVerifierTests {
     private let hardwareId = "TEST-SERIAL-123"
     private let privateKey = Curve25519.Signing.PrivateKey()
-    
+    private let salt = "com.test.amorekit"
+
     private func makeVerifier(
         publicKey: Curve25519.Signing.PublicKey? = nil,
         hardwareId: String? = nil
     ) -> LicenseTokenVerifier {
         LicenseTokenVerifier(
             publicKey: publicKey ?? privateKey.publicKey,
-            deviceIdentity: MockDeviceIdentity(identifier: hardwareId ?? self.hardwareId)
+            deviceIdentity: MockDeviceIdentity(identifier: hardwareId ?? self.hardwareId),
+            salt: salt
         )
     }
     
     // MARK: - decode
     
-    @Test func decodeReturnsPayloadForValidToken() throws {
+    /// Tokens issued before the SDK hashed identifiers carry the raw value;
+    /// they must keep decoding so existing installs stay valid without
+    /// re-activation.
+    @Test func decodeAcceptsLegacyRawHardwareId() throws {
         let token = try signV2Token(privateKey: privateKey, hardwareId: hardwareId, nonce: "n-1")
         let payload = try makeVerifier().decode(token, expectedNonce: "n-1")
         #expect(payload.hardwareId == hardwareId)
@@ -42,6 +47,13 @@ struct LicenseTokenVerifierTests {
         #expect(payload.nonce == "n-1")
     }
     
+    @Test func decodeAcceptsHashedHardwareId() throws {
+        let hashed = MockDeviceIdentity(identifier: hardwareId).hashedIdentifier(salt: salt)
+        let token = try signV2Token(privateKey: privateKey, hardwareId: hashed, nonce: "n-1")
+        let payload = try makeVerifier().decode(token, expectedNonce: "n-1")
+        #expect(payload.hardwareId == hashed)
+    }
+
     @Test func decodeThrowsHardwareIdMismatchForOtherDevice() throws {
         let token = try signV2Token(privateKey: privateKey, hardwareId: "OTHER-HW", nonce: "n-1")
         #expect(throws: AmoreError.hardwareIdMismatch) {

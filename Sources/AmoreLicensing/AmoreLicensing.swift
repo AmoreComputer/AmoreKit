@@ -47,7 +47,11 @@ public final class AmoreLicensing: Licensing {
         self.tokenStore = tokenStore ?? FileTokenStore(bundleIdentifier: bundleIdentifier)
         self.deviceIdentity = deviceIdentity
         self.licenseClient = HTTPLicenseClient(server: server ?? .amore(for: bundleIdentifier))
-        self.verifier = LicenseTokenVerifier(publicKey: signingKey, deviceIdentity: deviceIdentity)
+        self.verifier = LicenseTokenVerifier(
+            publicKey: signingKey,
+            deviceIdentity: deviceIdentity,
+            salt: bundleIdentifier
+        )
         if configuration.validationFrequency.shouldValidateAtLaunch {
             validateLocally()
             Task { [self] in try? await validate() }
@@ -96,7 +100,11 @@ public final class AmoreLicensing: Licensing {
         self.tokenStore = tokenStore
         self.deviceIdentity = deviceIdentity
         self.licenseClient = licenseClient
-        self.verifier = LicenseTokenVerifier(publicKey: publicKey, deviceIdentity: deviceIdentity)
+        self.verifier = LicenseTokenVerifier(
+            publicKey: publicKey,
+            deviceIdentity: deviceIdentity,
+            salt: bundleIdentifier
+        )
     }
 
     /// Activates a license on this device using the given license key.
@@ -106,7 +114,9 @@ public final class AmoreLicensing: Licensing {
         let nonce = UUID().uuidString
         let token = try await mapClientErrors {
             try await self.licenseClient.activate(
-                licenseKey: licenseKey, hardwareId: self.deviceIdentity.identifier, nonce: nonce,
+                licenseKey: licenseKey,
+                hardwareId: self.deviceIdentity.hashedIdentifier(salt: self.bundleIdentifier),
+                nonce: nonce,
                 name: self.deviceIdentity.deviceName
             )
         }
