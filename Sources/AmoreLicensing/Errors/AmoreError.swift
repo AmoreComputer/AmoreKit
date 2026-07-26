@@ -1,7 +1,7 @@
 import Foundation
 
 /// Errors thrown by AmoreLicensing operations.
-public enum AmoreError: LocalizedError, Equatable, Sendable {
+public enum AmoreError: LocalizedError, Hashable, Sendable {
     /// A server-returned client error.
     case client(ClientError)
     /// The license token's hardware ID does not match this device.

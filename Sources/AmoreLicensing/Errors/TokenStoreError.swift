@@ -1,7 +1,7 @@
 import Foundation
 
 /// Errors from token store operations used to persist license tokens.
-public enum TokenStoreError: LocalizedError, Equatable, Sendable {
+public enum TokenStoreError: LocalizedError, Hashable, Sendable {
     case deleteFailed(String)
     case retrieveFailed(String)
     case storeFailed(String)

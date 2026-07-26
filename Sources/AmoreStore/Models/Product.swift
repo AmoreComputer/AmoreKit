@@ -13,9 +13,12 @@ public struct Product: Identifiable, Hashable, Codable, Sendable {
     /// Pricing information, or `nil` when no price is configured.
     public var price: Price?
     
-    /// The checkout URL for this product
+    /// The web checkout URL for this product.
     ///
-    /// Open it to send the customer to checkout, for example:
+    /// Prefer the `amoreCheckout(item:checkout:)` view modifier from the
+    /// `AmoreCheckout` module, which presents checkout in-app and activates
+    /// the purchased license automatically. Open this URL directly only when
+    /// you want the plain browser flow with no activation or recovery:
     /// ```swift
     /// NSWorkspace.shared.open(product.checkoutURL)
     /// ```

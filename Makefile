@@ -7,6 +7,7 @@ docs:
 		--transform-for-static-hosting \
 		--target AmoreLicensing \
 		--target AmoreStore \
+		--target AmoreCheckout \
 		--output-path ./docs \
 		--enable-experimental-combined-documentation \
 

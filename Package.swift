@@ -59,6 +59,27 @@ targets.append(
 )
 #endif
 
+#if os(macOS)
+products.append(
+    .library(
+        name: "AmoreCheckout",
+        targets: ["AmoreCheckout"]
+    )
+)
+targets.append(
+    .target(
+        name: "AmoreCheckout",
+        dependencies: ["AmoreStore", "AmoreLicensing"]
+    )
+)
+targets.append(
+    .testTarget(
+        name: "AmoreCheckoutTests",
+        dependencies: ["AmoreCheckout", "AmoreLicensing", "AmoreStore"]
+    )
+)
+#endif
+
 let package = Package(
     name: "AmoreKit",
     platforms: [
