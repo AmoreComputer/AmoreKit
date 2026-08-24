@@ -126,6 +126,43 @@ struct LicensePayloadDecodeTests {
         #expect(license.customer == nil)
     }
 
+    @Test func licenseFromPayloadCarriesIssueDate() throws {
+        let json = """
+        {
+          "exp": 1800000000,
+          "iat": 1779000000,
+          "hardware_id": "hw-1",
+          "license_id": "C7B53B0E-2C18-4F1D-8C9B-2B7B6A8B6A7E",
+          "nonce": "n-1",
+          "product": { "name": "Pro", "identifier": "pro" },
+          "entitlements": [],
+          "issued_at": 1778000000
+        }
+        """
+        let payload = try decodePayload(json)
+        let license = License(from: payload)
+        #expect(license.issuedAt == Date(timeIntervalSince1970: 1_778_000_000))
+    }
+
+    // An older token has no `issued_at` claim; the optional must decode to
+    // nil, not error.
+    @Test func licenseHasNilIssueDateWhenClaimAbsent() throws {
+        let json = """
+        {
+          "exp": 1800000000,
+          "iat": 1779000000,
+          "hardware_id": "hw-1",
+          "license_id": "C7B53B0E-2C18-4F1D-8C9B-2B7B6A8B6A7E",
+          "nonce": "n-1",
+          "product": { "name": "Pro", "identifier": "pro" },
+          "entitlements": []
+        }
+        """
+        let payload = try decodePayload(json)
+        let license = License(from: payload)
+        #expect(license.issuedAt == nil)
+    }
+
     // A `customer` object may be present without an `email` (partial or
     // forward-compatible token). It must decode with a nil email rather than
     // throw and reject the entire license.

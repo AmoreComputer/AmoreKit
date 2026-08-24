@@ -16,6 +16,11 @@ public struct License: Identifiable, Hashable, Codable, Sendable {
     /// The customer this license was issued to, or `nil` if the license has no
     /// associated customer. Use `customer?.email` to show "Licensed to <email>".
     public var customer: Customer?
+    /// When the license was issued, or `nil` if the token predates this claim.
+    /// For purchased licenses this is the purchase time. Useful for showing
+    /// license details in settings, e.g. to help customers find their email
+    /// receipt.
+    public var issuedAt: Date?
     
     /// The product name this license is for.
     @available(*, deprecated, renamed: "product.name", message: "Use `product.name` instead.")
@@ -31,7 +36,8 @@ extension License {
             expiresAt: payload.exp,
             entitlements: payload.entitlements,
             subscriptionState: payload.subscriptionState,
-            customer: payload.customer
+            customer: payload.customer,
+            issuedAt: payload.issuedAt
         )
     }
     
