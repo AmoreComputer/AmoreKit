@@ -19,7 +19,8 @@ public struct License: Identifiable, Hashable, Codable, Sendable {
     /// When the license was issued, or `nil` if the token predates this claim.
     /// For purchased licenses this is the purchase time. Useful for showing
     /// license details in settings, e.g. to help customers find their email
-    /// receipt.
+    /// receipt. The server carries this claim on every token it mints for the
+    /// license, so the value is stable across validations.
     public var issuedAt: Date?
     
     /// The product name this license is for.
