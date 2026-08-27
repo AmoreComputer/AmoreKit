@@ -10,6 +10,7 @@ struct LicensePayload: Codable, Sendable {
     var entitlements: Set<License.Entitlement> = []
     var subscriptionState: SubscriptionState?
     var customer: Customer?
+    var issuedAt: Date?
     
     enum CodingKeys: String, CodingKey {
         case exp
@@ -21,5 +22,6 @@ struct LicensePayload: Codable, Sendable {
         case entitlements
         case subscriptionState = "subscription_state"
         case customer
+        case issuedAt = "issued_at"
     }
 }
