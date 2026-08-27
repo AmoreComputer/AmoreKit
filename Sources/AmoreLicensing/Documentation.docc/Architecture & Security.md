@@ -81,6 +81,11 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
 - The bundle identifier salt makes the same device pseudonymous per app, so the server cannot correlate a device across apps
 - Hashing defeats enumeration and leakage of device identifiers, not targeted confirmation: the salt is public, so a candidate identifier can be checked for a match
 
+> Note: For a plain-language list of every field AmoreLicensing sends, written
+> for the people who use your app, see
+> [What your app sends to Amore](https://amore.computer/privacy/app-data/).
+> It carries a paragraph you can paste into your own privacy policy.
+
 ### Grace Period
 - App continues working N days after last successful validation
 - Handles temporary network outages or server downtime
