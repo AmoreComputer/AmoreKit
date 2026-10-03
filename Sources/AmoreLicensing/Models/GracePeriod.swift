@@ -1,6 +1,10 @@
 import Foundation
 
 /// The duration after token expiry during which the license remains usable.
+///
+/// Grace covers a license server the app cannot reach. It does not apply to a
+/// license that has passed its own end date, unless it is a subscription that
+/// renews.
 public enum GracePeriod: Sendable {
     /// A grace period measured in days.
     case days(Int)

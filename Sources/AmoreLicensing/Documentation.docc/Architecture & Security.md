@@ -87,7 +87,8 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
 > It carries a paragraph you can paste into your own privacy policy.
 
 ### Grace Period
-- App continues working N days after last successful validation
+- App continues working N days after its token expires
 - Handles temporary network outages or server downtime
+- Does not apply to a license past its own end date, unless it is a subscription that renews
 - Configurable per-app (default: 7 days). ``LicensingConfiguration/gracePeriod``
-- Stored: last validation timestamp from JWT
+- Needs no extra state: the SDK computes it from the stored token's expiry

@@ -6,7 +6,8 @@ public struct License: Identifiable, Hashable, Codable, Sendable {
     public var id: UUID
     /// The product this license is for.
     public var product: Product
-    /// When the license expires, or `nil` if it never expires.
+    /// When the license expires, or `nil` if it never expires or the token
+    /// predates this claim. A subscription's date moves with each renewal.
     public var expiresAt: Date?
     /// The set of entitlement keys granted by this license.
     public var entitlements: Set<Entitlement>
@@ -34,7 +35,7 @@ extension License {
         self = License(
             id: payload.licenseId,
             product: payload.product,
-            expiresAt: payload.exp,
+            expiresAt: payload.expiresAt,
             entitlements: payload.entitlements,
             subscriptionState: payload.subscriptionState,
             customer: payload.customer,

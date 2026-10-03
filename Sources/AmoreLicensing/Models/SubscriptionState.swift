@@ -25,6 +25,13 @@ public enum SubscriptionState: Sendable, Hashable {
     /// Terminal: canceled, unpaid, expired, or any unrecoverable state.
     case lapsed
     
+    /// Whether the subscription renews, so each renewal moves its end date.
+    var renews: Bool {
+        switch self {
+        case .renewing, .trialing(_, canceledAt: nil): true
+        default: false
+        }
+    }
 }
 
 extension SubscriptionState: Codable {

@@ -208,6 +208,43 @@ struct LicensePayloadDecodeTests {
         #expect(license.issuedAt == nil)
     }
 
+    @Test func licenseFromPayloadCarriesExpiry() throws {
+        let json = """
+        {
+          "exp": 1800000000,
+          "iat": 1779000000,
+          "hardware_id": "hw-1",
+          "license_id": "C7B53B0E-2C18-4F1D-8C9B-2B7B6A8B6A7E",
+          "nonce": "n-1",
+          "product": { "name": "Pro", "identifier": "pro" },
+          "entitlements": [],
+          "expires_at": 1790000000
+        }
+        """
+        let payload = try decodePayload(json)
+        let license = License(from: payload)
+        #expect(license.expiresAt == Date(timeIntervalSince1970: 1_790_000_000))
+    }
+
+    // `exp` only bounds the token. A license that never expires has no
+    // `expires_at` claim and must not report the token's expiry as its own.
+    @Test func licenseHasNilExpiryWhenClaimAbsent() throws {
+        let json = """
+        {
+          "exp": 1800000000,
+          "iat": 1779000000,
+          "hardware_id": "hw-1",
+          "license_id": "C7B53B0E-2C18-4F1D-8C9B-2B7B6A8B6A7E",
+          "nonce": "n-1",
+          "product": { "name": "Pro", "identifier": "pro" },
+          "entitlements": []
+        }
+        """
+        let payload = try decodePayload(json)
+        let license = License(from: payload)
+        #expect(license.expiresAt == nil)
+    }
+
     // A `customer` object may be present without an `email` (partial or
     // forward-compatible token). It must decode with a nil email rather than
     // throw and reject the entire license.
