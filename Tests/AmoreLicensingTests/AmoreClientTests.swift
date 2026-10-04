@@ -208,9 +208,10 @@ import Testing
         let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
         let expDate = Date().addingTimeInterval(-2 * 24 * 3600) // expired 2 days ago
+        let licenseId = UUID()
         let expired = try signToken(
             privateKey: privateKey, hardwareId: hardwareId, nonce: "old",
-            exp: expDate
+            exp: expDate, licenseId: licenseId
         )
         try store.store(expired)
         
@@ -224,9 +225,9 @@ import Testing
             Issue.record("Expected gracePeriod, got \(result)")
             return
         }
-        #expect(abs(license.expiresAt!.timeIntervalSince(expDate)) < 1)
+        #expect(license.id == licenseId)
     }
-    
+
     @Test func validateExpiredTokenValidates() async throws {
         let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
@@ -354,11 +355,13 @@ import Testing
         let (privateKey, publicKey) = makeKeys()
         let store = MockTokenStore()
         let expDate = Date().addingTimeInterval(-2 * 24 * 3600) // expired 2 days ago
+        let licenseId = UUID()
         let token = try signToken(
-            privateKey: privateKey, hardwareId: hardwareId, nonce: "stored", exp: expDate
+            privateKey: privateKey, hardwareId: hardwareId, nonce: "stored", exp: expDate,
+            licenseId: licenseId
         )
         try store.store(token)
-        
+
         let client = try AmoreLicensing(
             publicKey: publicKey.rawRepresentation.base64URLEncodedString(),
             bundleIdentifier: bundleId,
@@ -366,12 +369,12 @@ import Testing
             deviceIdentity: MockDeviceIdentity(identifier: hardwareId),
             tokenStore: store
         )
-        
+
         guard case .gracePeriod(let license) = client.status else {
             Issue.record("Expected gracePeriod on first synchronous read, got \(client.status)")
             return
         }
-        #expect(abs(license.expiresAt!.timeIntervalSince(expDate)) < 1)
+        #expect(license.id == licenseId)
     }
     
     /// An expired token whose grace has already elapsed must stay `.unknown` at

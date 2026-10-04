@@ -11,6 +11,8 @@ struct LicensePayload: Codable, Sendable {
     var subscriptionState: SubscriptionState?
     var customer: Customer?
     var issuedAt: Date?
+    /// The license's own end date. `exp` only bounds this token.
+    var expiresAt: Date?
     
     enum CodingKeys: String, CodingKey {
         case exp
@@ -23,5 +25,6 @@ struct LicensePayload: Codable, Sendable {
         case subscriptionState = "subscription_state"
         case customer
         case issuedAt = "issued_at"
+        case expiresAt = "expires_at"
     }
 }

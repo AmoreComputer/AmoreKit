@@ -78,16 +78,21 @@ struct CheckoutCompletedView: View {
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
     }
     
-    // The single line that best describes how long the purchase lasts:
-    // the renewal date for a live subscription, otherwise the expiry.
+    // The single line that best describes how long the purchase lasts: the
+    // renewal date, the end of a trial that converts, "Lifetime" for a
+    // one-time purchase that never expires, otherwise the expiry.
     private var validity: (label: String, value: String)? {
-        if case .renewing(let renewsAt) = completion.license.subscriptionState {
-            return ("Renews", renewsAt.formatted(date: .abbreviated, time: .omitted))
+        let license = completion.license
+        switch license.subscriptionState {
+        case .renewing(let renewsAt): return ("Renews", Self.day(renewsAt))
+        case .trialing(let trialEndsAt, canceledAt: nil): return ("Trial ends", Self.day(trialEndsAt))
+        case nil where license.expiresAt == nil: return ("License", "Lifetime")
+        default: return license.expiresAt.map { ("Valid until", Self.day($0)) }
         }
-        if let expiresAt = completion.license.expiresAt {
-            return ("Valid until", expiresAt.formatted(date: .abbreviated, time: .omitted))
-        }
-        return nil
+    }
+
+    private static func day(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .omitted)
     }
     
     private func detailRow(_ label: String, _ value: String) -> some View {

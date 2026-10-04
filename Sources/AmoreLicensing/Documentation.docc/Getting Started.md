@@ -58,7 +58,7 @@ case .valid(let license):
 case .invalid:
     print("License is invalid")
 case .gracePeriod(let license):
-    print("Grace period until \(endDate)")
+    print("License not verified recently. \(license.product.name) works during the grace period.")
 case .unknown:
     print("License status unknown")
 }

@@ -239,10 +239,16 @@ public final class AmoreLicensing: Licensing {
     }
     
     /// The license a still-within-grace expired payload represents, or `nil` once
-    /// the grace period has elapsed.
+    /// the grace period has elapsed. Grace covers a server the app cannot reach,
+    /// not a license that has ended, so a license past its own end date gets none
+    /// unless it is a subscription that renews.
     private func graceLicense(for payload: LicensePayload) -> License? {
         let graceEnd = payload.exp.addingTimeInterval(configuration.gracePeriod.timeInterval)
         guard graceEnd >= .now else { return nil }
+        if let licenseEnd = payload.expiresAt, licenseEnd <= .now,
+           payload.subscriptionState?.renews != true {
+            return nil
+        }
         return License(from: payload)
     }
 

@@ -2,7 +2,8 @@ import Foundation
 
 /// The result of a license validation check.
 public enum ValidationStatus: Sendable, Equatable {
-    /// The license has expired but is within the configured grace period.
+    /// The stored token has expired and no refresh has succeeded yet. The
+    /// license works until ``LicensingConfiguration/gracePeriod`` elapses.
     case gracePeriod(License)
     /// The license is invalid or revoked.
     case invalid

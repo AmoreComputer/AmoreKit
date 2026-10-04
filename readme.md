@@ -35,7 +35,7 @@ struct ContentView: View {
         case .valid(let license):
             Text("Licensed to \(license.name)")
         case .gracePeriod(let license):
-            Text("License expired — grace period until \(license.expiresAt!)")
+            Text("License not verified recently. \(license.product.name) works during the grace period.")
         case .invalid:
             Text("License invalid")
         case .unknown:
