@@ -7,7 +7,7 @@ import Foundation
 /// further checks by calling ``AmoreLicensing/validate()`` from your app's
 /// lifecycle, for example when the window comes to the foreground.
 public enum ValidationFrequency: Sendable, Equatable {
-    /// Only refresh once the token has expired.
+    /// Only refresh once the token has expired or the system clock is set back.
     case afterExpiration
     /// Refresh when the token is more than a day old.
     case daily
@@ -25,8 +25,9 @@ public enum ValidationFrequency: Sendable, Equatable {
     /// Whether a server refresh is due for a token issued at `issuedAt`.
     ///
     /// ``manual`` and ``afterExpiration`` never refresh proactively (the token
-    /// is only refreshed once it has actually expired); ``everyLaunch`` always
-    /// refreshes; interval-based cases refresh once the interval has elapsed.
+    /// is only refreshed once it has expired or the system clock is set back);
+    /// ``everyLaunch`` always refreshes; interval-based cases refresh once the
+    /// interval has elapsed.
     func isRefreshDue(issuedAt: Date) -> Bool {
         guard let interval = timeInterval else { return false }
         return Date().timeIntervalSince(issuedAt) >= interval

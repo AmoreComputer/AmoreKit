@@ -122,6 +122,7 @@ public final class AmoreLicensing: Licensing {
         }
         let payload = try verifier.decode(token, expectedNonce: nonce)
         do { try tokenStore.store(token) } catch { throw .tokenStore(error) }
+        recordClock(issuedAt: payload.iat)
         status = .valid(License(from: payload))
     }
 
@@ -143,7 +144,11 @@ public final class AmoreLicensing: Licensing {
     /// The token is verified locally (signature, expiry, hardware ID). If it is
     /// stale for the configured ``ValidationFrequency`` (or has expired) it is
     /// refreshed from the server; if that refresh fails the license enters its
-    /// ``LicensingConfiguration/gracePeriod``.
+    /// ``LicensingConfiguration/gracePeriod``. A system clock more than an hour
+    /// behind the latest time seen makes the local expiry check untrusted: the
+    /// token is refreshed, and if the server cannot be reached or rejects the
+    /// license, the license is invalid with no grace period. See
+    /// <doc:Architecture-&-Security>.
     ///
     /// AmoreLicensing calls this automatically once at launch (for every
     /// ``ValidationFrequency`` except ``ValidationFrequency/manual``). It does
@@ -171,6 +176,8 @@ public final class AmoreLicensing: Licensing {
             throw AmoreError.hardwareIdMismatch
         case .unverifiable:
             try await refreshToken(token)
+        case .decoded(let payload) where isClockSetBack(issuedAt: payload.iat):
+            try await refreshToken(token)
         case .decoded(let payload):
             if payload.exp < Date() || configuration.validationFrequency.isRefreshDue(issuedAt: payload.iat) {
                 try await refreshToken(token, localPayload: payload)
@@ -183,12 +190,16 @@ public final class AmoreLicensing: Licensing {
 
     // MARK: - Private
 
+    private var clockKey: String { "AmoreLicensing.latestValidation.\(bundleIdentifier)" }
+
     private func validateLocally() {
         guard let token = try? tokenStore.retrieve() else { return }
         switch verifier.decodeLocally(token) {
         case .hardwareMismatch:
             status = .invalid
         case .unverifiable:
+            break
+        case .decoded(let payload) where isClockSetBack(issuedAt: payload.iat):
             break
         case .decoded(let payload) where payload.exp > Date():
             status = .valid(License(from: payload))
@@ -213,6 +224,7 @@ public final class AmoreLicensing: Licensing {
             let newToken = try await licenseClient.validate(token: token, nonce: nonce)
             let payload = try verifier.decode(newToken, expectedNonce: nonce)
             do { try tokenStore.store(newToken) } catch { throw AmoreError.tokenStore(error) }
+            recordClock(issuedAt: payload.iat)
             status = .valid(License(from: payload))
         } catch let error as ClientError {
             status = .invalid
@@ -250,6 +262,26 @@ public final class AmoreLicensing: Licensing {
             return nil
         }
         return License(from: payload)
+    }
+
+    /// Whether the system clock is more than an hour behind the later of the
+    /// recorded time and the token's signed issue time, which makes an expired
+    /// or revoked token look current. Records the current time when it is the
+    /// latest seen. The hour absorbs clock differences between this device and
+    /// the server.
+    private func isClockSetBack(issuedAt: Date) -> Bool {
+        let now = Date()
+        let recorded = UserDefaults.standard.object(forKey: clockKey) as? Date ?? .distantPast
+        let latest = max(recorded, issuedAt)
+        if now >= latest { UserDefaults.standard.set(now, forKey: clockKey) }
+        return latest.timeIntervalSince(now) > 3600
+    }
+
+    /// Records the signed issue time of a token the server just issued. Server
+    /// time, not the system clock, is what makes a clock corrected backwards
+    /// trusted again and keeps a clock set back distrusted.
+    private func recordClock(issuedAt: Date) {
+        UserDefaults.standard.set(issuedAt, forKey: clockKey)
     }
 
     private func mapClientErrors<T>(
