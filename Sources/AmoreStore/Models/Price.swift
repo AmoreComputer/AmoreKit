@@ -28,12 +28,15 @@ extension Price {
         decimalAmount.formatted(.currency(code: currency))
     }
     
-    /// Minor-unit exponent for `currency` (2 for USD, 0 for JPY, 3 for BHD),
+    /// Minor-unit exponent Stripe uses for `currency` (2 for USD, 0 for JPY, 3 for BHD).
+    /// Stripe counts some currencies in hundredths that Foundation gives no
+    /// minor unit (ISK, UGX, HUF), so Foundation's currency metadata does not apply.
     private static func fractionDigits(for currency: String) -> Int {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = currency
-        return formatter.maximumFractionDigits
+        switch currency.uppercased() {
+        case "BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "VND", "VUV", "XAF", "XOF", "XPF": 0
+        case "BHD", "JOD", "KWD", "OMR", "TND": 3
+        default: 2
+        }
     }
     
 }

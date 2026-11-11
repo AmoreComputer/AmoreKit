@@ -3,8 +3,8 @@
 
 import PackageDescription
 
-// AmoreStore depends on Foundation currency metadata (NumberFormatter) that is
-// only reliable on Apple platforms, so it is built only there.
+// AmoreStore depends on Foundation currency formatting that is only reliable
+// on Apple platforms, so it is built only there.
 var products: [Product] = [
     .library(
         name: "AmoreLicensing",

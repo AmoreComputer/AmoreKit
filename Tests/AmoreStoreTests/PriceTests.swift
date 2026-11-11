@@ -22,6 +22,13 @@ import Testing
         #expect(price.decimalAmount == Decimal(string: "1.234"))
     }
 
+    @Test(arguments: ["HUF", "ISK", "UGX"])
+    func decimalAmountForCurrencyStripeCountsInHundredths(currency: String) {
+        // Foundation gives these currencies no minor unit, Stripe gives them two digits.
+        let price = Price(unitAmount: 399_000, currency: currency, recurringInterval: nil)
+        #expect(price.decimalAmount == Decimal(3990))
+    }
+
     @Test func displayPriceUsesCurrencyFormatting() {
         let price = Price(unitAmount: 999, currency: "USD", recurringInterval: .month)
         // Locale-independent checks: the formatted amount and a currency marker are present.
