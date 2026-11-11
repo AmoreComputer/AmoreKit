@@ -8,6 +8,7 @@ import Testing
 // `AmoreStore.Product` resolves to a member of that type rather than a member
 // of the module and fails to compile. Importing just `Product` sidesteps that
 // and still resolves unambiguously against `AmoreLicensing`'s own `Product`.
+import struct AmoreStore.Price
 import struct AmoreStore.Product
 
 /// Returns queued responses one at a time, repeating the last one.
@@ -36,7 +37,7 @@ final class ResponseSequence: @unchecked Sendable {
             name: "Pro",
             durationInSeconds: nil,
             deviceLimit: 3,
-            price: nil,
+            price: Price(unitAmount: 1499, currency: "USD", recurringInterval: nil),
             checkoutURL: URL(string: "https://api.amore.computer/v1/checkout/x")!
         )
     }
@@ -99,6 +100,7 @@ final class ResponseSequence: @unchecked Sendable {
 
         let result = await checkout.start(makeProduct())
 
+        #expect(client.lastCurrency == "USD")
         #expect(licensing.activatedKeys == ["KEY-1"])
         guard case .completed(let license, let licenseKey) = result else {
             Issue.record("Expected .completed, got \(result)")

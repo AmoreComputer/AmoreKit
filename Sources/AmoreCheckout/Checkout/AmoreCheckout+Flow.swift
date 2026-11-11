@@ -80,7 +80,7 @@ extension AmoreCheckout {
         let session: CheckoutSession
         do {
             session = try await client.createSession(
-                productId: product.id, customerEmail: customerEmail
+                productId: product.id, customerEmail: customerEmail, currency: product.price?.currency
             )
         } catch {
             guard !Task.isCancelled else { return .cancelled }

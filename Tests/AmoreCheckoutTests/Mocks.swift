@@ -10,9 +10,11 @@ final class MockCheckoutSessionClient: CheckoutSessionClient, @unchecked Sendabl
     var onStatus: (@Sendable (String) async throws -> CheckoutSessionStatusResponse)?
     private(set) var createCallCount = 0
     private(set) var statusCallCount = 0
+    private(set) var lastCurrency: String?
 
-    func createSession(productId: UUID, customerEmail: String?) async throws(CheckoutClientError) -> CheckoutSession {
+    func createSession(productId: UUID, customerEmail: String?, currency: String?) async throws(CheckoutClientError) -> CheckoutSession {
         createCallCount += 1
+        lastCurrency = currency
         guard let onCreate else { throw CheckoutClientError.invalidResponse }
         return try await narrowing { try await onCreate(productId, customerEmail) }
     }

@@ -12,6 +12,8 @@ struct HTTPProductsClient: ProductsClient {
             .appendingPathComponent("v1/public/apps")
             .appendingPathComponent(bundleIdentifier)
             .appendingPathComponent("products")
+            // The server answers with the price in the currency of this region.
+            .appending(queryItems: [URLQueryItem(name: "country", value: Locale.current.region?.identifier)])
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"

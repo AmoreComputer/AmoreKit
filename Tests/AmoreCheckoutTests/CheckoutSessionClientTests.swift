@@ -45,7 +45,9 @@ private final class CapturedRequest: @unchecked Sendable {
         )
         let productId = UUID()
 
-        let session = try await client.createSession(productId: productId, customerEmail: "b@example.com")
+        let session = try await client.createSession(
+            productId: productId, customerEmail: "b@example.com", currency: "USD"
+        )
 
         #expect(session.sessionId == "cs_1")
         #expect(session.checkoutURL == URL(string: "https://checkout.stripe.com/c/pay/cs_1"))
@@ -60,6 +62,7 @@ private final class CapturedRequest: @unchecked Sendable {
         let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: String])
         #expect(json["productId"] == productId.uuidString)
         #expect(json["customerEmail"] == "b@example.com")
+        #expect(json["currency"] == "USD")
     }
 
     @Test func createSessionOmitsNilEmail() async throws {
@@ -70,7 +73,7 @@ private final class CapturedRequest: @unchecked Sendable {
             captured: captured
         )
 
-        _ = try await client.createSession(productId: UUID(), customerEmail: nil)
+        _ = try await client.createSession(productId: UUID(), customerEmail: nil, currency: nil)
 
         let body = try #require(captured.request?.httpBody)
         let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: String])
