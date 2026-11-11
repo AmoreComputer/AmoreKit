@@ -4,7 +4,7 @@ typealias CheckoutTransport = @Sendable (URLRequest) async throws -> (Data, URLR
 
 /// Creates checkout sessions and reads their status from the licensing server.
 protocol CheckoutSessionClient: Sendable {
-    func createSession(productId: UUID, customerEmail: String?) async throws(CheckoutClientError) -> CheckoutSession
+    func createSession(productId: UUID, customerEmail: String?, currency: String?) async throws(CheckoutClientError) -> CheckoutSession
     func sessionStatus(sessionId: String) async throws(CheckoutClientError) -> CheckoutSessionStatusResponse
 }
 
@@ -23,17 +23,18 @@ struct HTTPCheckoutSessionClient: CheckoutSessionClient {
         self.transport = transport
     }
     
-    func createSession(productId: UUID, customerEmail: String?) async throws(CheckoutClientError) -> CheckoutSession {
+    func createSession(productId: UUID, customerEmail: String?, currency: String?) async throws(CheckoutClientError) -> CheckoutSession {
         struct Body: Encodable {
             let productId: UUID
             let customerEmail: String?
+            let currency: String?
         }
         var request = URLRequest(url: sessionsURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         do {
-            request.httpBody = try JSONEncoder().encode(Body(productId: productId, customerEmail: customerEmail))
+            request.httpBody = try JSONEncoder().encode(Body(productId: productId, customerEmail: customerEmail, currency: currency))
         } catch {
             throw .network("Could not encode request: \(error.localizedDescription)")
         }

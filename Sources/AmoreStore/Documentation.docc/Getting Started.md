@@ -52,6 +52,16 @@ ForEach(products) { product in
 
 Use ``Price/recurringInterval`` to tell one-time purchases from subscriptions.
 
+### Local Currencies
+
+The price is in the currency of the customer's region, as set in System
+Settings, when the Stripe price has that currency. Add currencies to a price
+under its currency options in the Stripe dashboard. Customers in other regions
+see the price's default currency.
+
+Checkout opens in the currency shown: both the `AmoreCheckout` module and
+``Product/checkoutURL`` carry it to Stripe.
+
 ## Checkout
 
 Prefer the `AmoreCheckout` module: one view modifier presents Stripe checkout
