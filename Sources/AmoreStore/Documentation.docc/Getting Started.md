@@ -59,7 +59,7 @@ Settings, when the Stripe price has that currency. Add currencies to a price
 under its currency options in the Stripe dashboard. Customers in other regions
 see the price's default currency.
 
-Checkout charges the currency shown: both the `AmoreCheckout` module and
+Checkout opens in the currency shown: both the `AmoreCheckout` module and
 ``Product/checkoutURL`` carry it to Stripe.
 
 ## Checkout
