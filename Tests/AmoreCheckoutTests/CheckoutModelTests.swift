@@ -35,6 +35,15 @@ import Testing
         #expect(session.expiresAt == nil)
     }
 
+    @Test(arguments: ["http://checkout.example/pay", "file:///Applications/Calculator.app"])
+    func rejectsSessionWhoseCheckoutURLIsNotHTTPS(_ url: String) {
+        let json = #"{ "checkoutURL": "\#(url)", "sessionId": "cs_1" }"#
+
+        #expect(throws: DecodingError.self) {
+            try decoder.decode(CheckoutSession.self, from: Data(json.utf8))
+        }
+    }
+
     @Test func decodesCompleteStatusWithKey() throws {
         let json = """
         { "licenseKey": "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE-FFFFF-00000-11111", "status": "complete" }
