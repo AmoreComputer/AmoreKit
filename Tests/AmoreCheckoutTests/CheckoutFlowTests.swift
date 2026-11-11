@@ -525,6 +525,17 @@ final class ResponseSequence: @unchecked Sendable {
         #expect(checkout.navigationAction(for: wrongPath) == .allow)
     }
 
+    @Test(arguments: [
+        ("https://checkout.stripe.com/terms", true),
+        ("http://example.com", true),
+        ("file:///Applications/Calculator.app", false),
+        ("ssh://example.com", false),
+        ("x-custom-app://open", false),
+    ])
+    func popUpsOpenOnlyWebPagesInTheBrowser(_ url: String, opens: Bool) throws {
+        #expect(AmoreCheckout.opensInBrowser(try #require(URL(string: url))) == opens)
+    }
+
     // MARK: - Cancellation
 
     @Test func cancelEndsAnInFlightStartWithCancelled() async throws {
