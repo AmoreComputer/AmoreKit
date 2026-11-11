@@ -9,6 +9,13 @@ enum CheckoutNavigationAction: Equatable {
 // The server's success and cancel redirect pages are intercepted before they
 // render and folded back into the flow.
 extension AmoreCheckout {
+    // A page in the web view chooses the URL of a new window, so only a web
+    // page goes to the browser: any other scheme would start an app of the
+    // page's choice.
+    static func opensInBrowser(_ url: URL) -> Bool {
+        url.scheme == "http" || url.scheme == "https"
+    }
+
     func navigationAction(for url: URL) -> CheckoutNavigationAction {
         if matches(url, pathSuffix: "checkout/success") { return .interceptSuccess }
         if matches(url, pathSuffix: "checkout/cancel") { return .interceptCancel }

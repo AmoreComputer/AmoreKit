@@ -70,7 +70,7 @@ struct CheckoutWebView: NSViewRepresentable {
             for navigationAction: WKNavigationAction,
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
-            if let url = navigationAction.request.url {
+            if let url = navigationAction.request.url, AmoreCheckout.opensInBrowser(url) {
                 NSWorkspace.shared.open(url)
             }
             return nil
