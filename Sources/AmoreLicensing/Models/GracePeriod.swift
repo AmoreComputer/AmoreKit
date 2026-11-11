@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Grace covers a license server the app cannot reach. It does not apply to a
 /// license that has passed its own end date, unless it is a subscription that
-/// renews.
+/// renews. It also does not apply while the system clock is set back.
 public enum GracePeriod: Sendable {
     /// A grace period measured in days.
     case days(Int)

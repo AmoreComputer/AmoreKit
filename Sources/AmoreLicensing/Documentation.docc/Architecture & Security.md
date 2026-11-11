@@ -40,9 +40,10 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
    - Signature valid
    - Not expired
    - Hardware ID matches current device
+   - System clock not set back (see Clock Rollback)
 4. If valid: app runs normally
-5. If expired: attempt refresh from server
-6. If refresh fails: enter grace period (7 days default). ``LicensingConfiguration/gracePeriod``
+5. If expired or the system clock is set back: attempt refresh from server
+6. If refresh fails: enter grace period (7 days default), unless the system clock is set back. ``LicensingConfiguration/gracePeriod``
 7. After grace period: block or degrade features
 
 ### Refresh Flow (when JWT expires)
@@ -67,7 +68,7 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
 ### Offline Validation
 - JWT signature verified locally (no server round-trip)
 - Cryptographically proves JWT came from licensing server
-- Works without network until JWT expires
+- Works without network until JWT expires, unless the system clock is set back (see Clock Rollback)
 
 ### Hardware Binding
 - License tied to a specific device via its hardware ID
@@ -86,9 +87,16 @@ Server stores per-app private keys for signing JWTs. Clients verify signatures a
 > [What your app sends to Amore](https://amore.computer/privacy/app-data/).
 > It carries a paragraph you can paste into your own privacy policy.
 
+### Clock Rollback
+- The SDK keeps the latest time it has seen: the signed issue time of the newest token, moved forward by each later validation
+- A system clock more than an hour behind that time makes the stored token untrusted, so it is refreshed from the server. Setting the clock more than an hour behind that time does not extend an expired or revoked license. A device clock more than an hour behind the server's clock can also count as set back
+- While the clock is more than an hour behind that time and the server cannot be reached, the license is invalid, even if its token has not expired, and the grace period does not apply. A server answer sets the latest time to the new token's issue time, so a corrected clock is trusted again, and a clock that is still set back needs the server at each validation
+- A clock no more than an hour behind the latest time, or ahead of it, is not detected, so setting it to such a time before each launch keeps a token unexpired. The check stops casual tampering, not a determined user
+- The record is kept in `UserDefaults.standard` of the app that runs the SDK, not in the ``TokenStore``, so processes that share a token through a custom ``TokenStore`` each keep their own record. Deleting it leaves only the token's issue time as the limit
+
 ### Grace Period
 - App continues working N days after its token expires
 - Handles temporary network outages or server downtime
-- Does not apply to a license past its own end date, unless it is a subscription that renews
+- Does not apply to a license past its own end date, unless it is a subscription that renews, or while the system clock is set back (see Clock Rollback)
 - Configurable per-app (default: 7 days). ``LicensingConfiguration/gracePeriod``
 - Needs no extra state: the SDK computes it from the stored token's expiry
