@@ -45,6 +45,20 @@ import Testing
         #expect(store.load() == nil)
     }
 
+    @Test(arguments: ["file:///Applications/Calculator.app", "http://checkout.example/pay", "ssh://example.com"])
+    func loadReturnsNilForCheckoutURLThatIsNotHTTPS(_ url: String) throws {
+        let directory = try makeTempDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = PendingCheckoutStore(directory: directory)
+        try store.save(PendingCheckout(
+            session: CheckoutSession(sessionId: "cs_1", checkoutURL: try #require(URL(string: url))),
+            productId: UUID(),
+            createdAt: .now
+        ))
+
+        #expect(store.load() == nil)
+    }
+
     @Test func clearRemovesTheStoredCheckout() throws {
         let directory = try makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
