@@ -3,6 +3,7 @@ import Testing
 
 @testable import AmoreCheckout
 @testable import AmoreLicensing
+import struct AmoreStore.Price
 import struct AmoreStore.Product
 
 /// `start()` resolves a persisted pending session before creating a new one,
@@ -66,20 +67,19 @@ import struct AmoreStore.Product
     @Test func startActivatesACompletedPendingSessionInsteadOfCharging() async throws {
         let store = try makeStore()
         try savePending(to: store)
+        let paid = Price(unitAmount: 700, currency: "SGD", recurringInterval: nil)
         let client = MockCheckoutSessionClient()
         client.onStatus = { sessionId in
             #expect(sessionId == "cs_old")
-            return CheckoutSessionStatusResponse(status: .complete, licenseKey: "KEY-OLD")
+            return CheckoutSessionStatusResponse(status: .complete, licenseKey: "KEY-OLD", amountPaid: paid)
         }
         let licensing = MockLicenseActivating()
         let checkout = makeCheckout(client: client, licensing: licensing, store: store)
 
         let result = await checkout.start(makeProduct())
 
-        guard case .completed = result else {
-            Issue.record("Expected .completed, got \(result)")
-            return
-        }
+        // A resumed purchase reports what was charged for it, too.
+        #expect(result == .completed(CheckoutPurchase(amountPaid: paid, license: .fixture, licenseKey: "KEY-OLD")))
         #expect(licensing.activatedKeys == ["KEY-OLD"])
         #expect(client.createCallCount == 0)
         #expect(store.load() == nil)

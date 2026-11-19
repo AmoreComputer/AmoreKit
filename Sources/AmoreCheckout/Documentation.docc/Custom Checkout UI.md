@@ -8,16 +8,21 @@ The sheet modifier is a thin layer over ``AmoreCheckout``, which is UI-independe
 
 ## Custom Success Screens
 
-The sheet ends with a receipt-style success screen summarizing the activated license. Replace it with a screen of your own, built from the same ``CheckoutCompletion``, and call its ``CheckoutCompletion/onDone`` to close the sheet.
+The sheet ends with a receipt-style success screen summarizing the purchase: the product, the amount paid, and the activated license. Replace it with a screen of your own, built from the same ``CheckoutCompletion``, and call its ``CheckoutCompletion/onDone`` to close the sheet.
 
 ```swift
 .amoreCheckout(item: $buying, checkout: checkout, completedView: { completion in
     VStack {
         Text("Welcome to \(completion.product.name)!")
+        if let price = completion.displayPrice {
+            Text(price)
+        }
         Button("Start") { completion.onDone?() }
     }
 })
 ```
+
+``CheckoutCompletion/displayPrice`` is the price the built-in receipt shows: the amount charged at checkout, in the currency the customer paid in, after discounts and tax. When the server does not report the amount, it is the product's price. It is `nil` when the purchase charges its price later, as a trial does.
 
 > Note: `onDone` is `nil` in a container that closes itself, so a custom screen omits its button just as the default receipt does.
 
@@ -47,8 +52,8 @@ Skip the embedded web view entirely and hand the URL to the browser as soon as t
 Button("Buy") {
     Task {
         switch await checkout.start(product) {
-        case .completed(let license, _):
-            print("Unlocked \(license.product.name)")
+        case .completed(let purchase):
+            print("Unlocked \(purchase.license.product.name)")
         case .cancelled:
             break
         case .failed(let error):
@@ -78,8 +83,8 @@ case .awaitingPayment(let url):
     Link("Pay", destination: url)
 case .activating:
     Text("Activating…")
-case .completed(let license, _):
-    Text("Unlocked \(license.product.name)")
+case .completed(let purchase):
+    Text("Unlocked \(purchase.license.product.name)")
 case .failed(let error):
     Text(error.localizedDescription)
 }

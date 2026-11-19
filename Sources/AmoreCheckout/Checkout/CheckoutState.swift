@@ -15,7 +15,7 @@ public enum CheckoutState: Sendable, Hashable {
     /// The purchase is no longer safely cancellable.
     case activating
     /// The purchase completed and the license is active on this device.
-    case completed(License, licenseKey: String)
+    case completed(CheckoutPurchase)
     /// The flow failed. ``CheckoutError/activationFailed(licenseKey:underlying:)``
     /// means payment succeeded; keep showing the license key it carries.
     case failed(CheckoutError)

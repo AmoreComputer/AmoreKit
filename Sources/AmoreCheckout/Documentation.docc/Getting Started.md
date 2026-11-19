@@ -76,8 +76,8 @@ Pass `onResult` to receive the terminal ``CheckoutResult`` of every attempt, inc
 ```swift
 .amoreCheckout(item: $buying, checkout: checkout) { result in
     switch result {
-    case .completed(let license, let licenseKey):
-        print("Unlocked \(license.product.name) with \(licenseKey)")
+    case .completed(let purchase):
+        print("Unlocked \(purchase.license.product.name) with \(purchase.licenseKey)")
     case .cancelled:
         break
     case .failed(.activationFailed(let licenseKey, _)):
@@ -87,6 +87,8 @@ Pass `onResult` to receive the terminal ``CheckoutResult`` of every attempt, inc
     }
 }
 ```
+
+A completed result carries a ``CheckoutPurchase``: the activated license, its key, and the amount paid at checkout.
 
 > Tip: The sheet already shows the license key on success, and on ``CheckoutError/activationFailed(licenseKey:underlying:)`` it shows the key with a copy button. The result carries it for your own UI too, and the key is never persisted beyond the flow.
 

@@ -1,4 +1,5 @@
 import AmoreLicensing
+import struct AmoreStore.Price
 import struct AmoreStore.Product
 import SwiftUI
 
@@ -49,8 +50,8 @@ struct CheckoutCompletedView: View {
                 HStack {
                     Text(completion.product.name)
                         .font(.headline)
-                    if let price = completion.product.displayPrice {
-                        Spacer()
+                    Spacer()
+                    if let price = completion.displayPrice {
                         Text(price)
                             .font(.headline)
                             .foregroundStyle(.secondary)
@@ -110,6 +111,8 @@ struct CheckoutCompletedView: View {
 #Preview("With Done") {
     CheckoutCompletedView(
         completion: CheckoutCompletion(
+            // Charged in the customer's currency, not the product's USD.
+            amountPaid: Price(unitAmount: 4295, currency: "EUR", recurringInterval: nil),
             license: .preview,
             licenseKey: "AMORE-4F2A-91C7-BD03",
             onDone: {},

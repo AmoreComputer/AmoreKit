@@ -1,3 +1,4 @@
+import struct AmoreStore.Price
 import struct AmoreStore.Product
 import Foundation
 
@@ -21,7 +22,7 @@ extension AmoreCheckout {
     ///
     /// ``state`` tracks progress for observers and settles on the matching
     /// terminal state before the result is returned, so the two can never
-    /// disagree. Calling from ``CheckoutState/completed(_:licenseKey:)`` or
+    /// disagree. Calling from ``CheckoutState/completed(_:)`` or
     /// ``CheckoutState/failed(_:)`` starts a fresh attempt, so a Try Again
     /// button is just another `await checkout.start(product)`. Calling while
     /// an attempt is already in progress joins it and returns that attempt's
@@ -132,7 +133,7 @@ extension AmoreCheckout {
             guard let key = status.licenseKey else {
                 return fail(.pendingSessionUnresolved(underlying: nil))
             }
-            return await activate(licenseKey: key)
+            return await activate(licenseKey: key, amountPaid: status.amountPaid)
         case .processing:
             state = .activating
             return await poll(sessionId: pending.sessionId, paymentDeadline: nil)
@@ -178,7 +179,7 @@ extension AmoreCheckout {
                 switch status.status {
                 case .complete:
                     if let key = status.licenseKey {
-                        return await activate(licenseKey: key)
+                        return await activate(licenseKey: key, amountPaid: status.amountPaid)
                     }
                     // Payment landed; the license is still being issued.
                     state = .activating
@@ -203,7 +204,7 @@ extension AmoreCheckout {
         return .cancelled
     }
     
-    private func activate(licenseKey: String) async -> CheckoutResult {
+    private func activate(licenseKey: String, amountPaid: Price?) async -> CheckoutResult {
         state = .activating
         do {
             try await licensing.activate(licenseKey: licenseKey)
@@ -215,8 +216,9 @@ extension AmoreCheckout {
         guard case .valid(let license) = licensing.status else {
             return fail(.activationFailed(licenseKey: licenseKey, underlying: .invalidToken))
         }
-        state = .completed(license, licenseKey: licenseKey)
-        return .completed(license, licenseKey: licenseKey)
+        let purchase = CheckoutPurchase(amountPaid: amountPaid, license: license, licenseKey: licenseKey)
+        state = .completed(purchase)
+        return .completed(purchase)
     }
     
     private func fail(_ error: CheckoutError) -> CheckoutResult {

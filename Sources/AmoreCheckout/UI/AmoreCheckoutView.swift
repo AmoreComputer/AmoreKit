@@ -113,13 +113,8 @@ public struct AmoreCheckoutView<Completed: View>: View {
     }
     
     @ViewBuilder
-    private func completedContent(license: License, licenseKey: String) -> some View {
-        let completion = CheckoutCompletion(
-            license: license,
-            licenseKey: licenseKey,
-            onDone: onDone,
-            product: product
-        )
+    private func completedContent(_ purchase: CheckoutPurchase) -> some View {
+        let completion = CheckoutCompletion(purchase: purchase, onDone: onDone, product: product)
         if let completedView {
             completedView(completion)
         } else {
@@ -142,8 +137,8 @@ public struct AmoreCheckoutView<Completed: View>: View {
             }
         case .activating:
             ProgressView("Activating…")
-        case .completed(let license, let licenseKey):
-            completedContent(license: license, licenseKey: licenseKey)
+        case .completed(let purchase):
+            completedContent(purchase)
         case .failed(let error):
             CheckoutFailureView(error: error, portalURL: checkout.portalURL) {
                 guard case .failed = checkout.state else { return }

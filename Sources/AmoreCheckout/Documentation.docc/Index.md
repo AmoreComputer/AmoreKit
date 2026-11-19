@@ -23,6 +23,7 @@ The core is the UI-independent ``AmoreCheckout`` object. Observe its ``AmoreChec
 - ``SwiftUICore/View/amoreCheckout(item:checkout:customerEmail:onResult:)``
 - ``SwiftUICore/View/amoreCheckout(item:checkout:customerEmail:completedView:onResult:)``
 - ``CheckoutResult``
+- ``CheckoutPurchase``
 
 ### Customization
 
