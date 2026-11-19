@@ -1,3 +1,4 @@
+import struct AmoreStore.Price
 import Foundation
 
 /// Where a checkout session stands, as reported by the licensing server.
@@ -12,4 +13,6 @@ enum CheckoutSessionStatus: String, Codable, Sendable {
 struct CheckoutSessionStatusResponse: Codable, Equatable, Sendable {
     var status: CheckoutSessionStatus
     var licenseKey: String?
+    /// The total of the completed checkout, sent only with `licenseKey`.
+    var amountPaid: Price?
 }

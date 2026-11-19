@@ -86,12 +86,47 @@ final class ResponseSequence: @unchecked Sendable {
 
     // MARK: - Happy path
 
+    @Test func completionWithoutAnAmountFromTheServerCarriesNone() async throws {
+        let client = MockCheckoutSessionClient()
+        client.onCreate = { [session = makeSession()] _, _ in session }
+        client.onStatus = { _ in CheckoutSessionStatusResponse(status: .complete, licenseKey: "KEY-1") }
+        let checkout = makeCheckout(client: client, licensing: MockLicenseActivating(), store: try makeStore())
+
+        let result = await checkout.start(makeProduct())
+
+        let purchase = CheckoutPurchase(license: .fixture, licenseKey: "KEY-1")
+        #expect(result == .completed(purchase))
+        #expect(checkout.state == .completed(purchase))
+    }
+
+    @Test func trialCompletesWithTheZeroItCharged() async throws {
+        // The result reports what checkout charged; only the receipt hides
+        // a zero that the subscription charges later.
+        let zero = Price(unitAmount: 0, currency: "IDR", recurringInterval: nil)
+        let client = MockCheckoutSessionClient()
+        client.onCreate = { [session = makeSession()] _, _ in session }
+        client.onStatus = { _ in
+            CheckoutSessionStatusResponse(status: .complete, licenseKey: "KEY-1", amountPaid: zero)
+        }
+        let licensing = MockLicenseActivating()
+        licensing.activatedLicense = .trialFixture
+        let checkout = makeCheckout(client: client, licensing: licensing, store: try makeStore())
+
+        let result = await checkout.start(makeProduct())
+
+        let purchase = CheckoutPurchase(amountPaid: zero, license: .trialFixture, licenseKey: "KEY-1")
+        #expect(result == .completed(purchase))
+        #expect(checkout.state == .completed(purchase))
+    }
+
     @Test func happyPathActivatesAndCompletes() async throws {
         let client = MockCheckoutSessionClient()
         client.onCreate = { [session = makeSession()] _, _ in session }
+        // The product is priced in USD; the result carries what was charged.
+        let paid = Price(unitAmount: 569, currency: "EUR", recurringInterval: nil)
         let responses = ResponseSequence([
             CheckoutSessionStatusResponse(status: .open, licenseKey: nil),
-            CheckoutSessionStatusResponse(status: .complete, licenseKey: "KEY-1"),
+            CheckoutSessionStatusResponse(status: .complete, licenseKey: "KEY-1", amountPaid: paid),
         ])
         client.onStatus = { _ in responses.next() }
         let licensing = MockLicenseActivating()
@@ -102,19 +137,11 @@ final class ResponseSequence: @unchecked Sendable {
 
         #expect(client.lastCurrency == "USD")
         #expect(licensing.activatedKeys == ["KEY-1"])
-        guard case .completed(let license, let licenseKey) = result else {
-            Issue.record("Expected .completed, got \(result)")
-            return
-        }
-        #expect(license.id == License.fixture.id)
         // The issued key travels with the terminal payload so the success
         // screen can show it.
-        #expect(licenseKey == "KEY-1")
-        guard case .completed(_, licenseKey: let stateKey) = checkout.state else {
-            Issue.record("Expected .completed state, got \(checkout.state)")
-            return
-        }
-        #expect(stateKey == "KEY-1")
+        let purchase = CheckoutPurchase(amountPaid: paid, license: .fixture, licenseKey: "KEY-1")
+        #expect(result == .completed(purchase))
+        #expect(checkout.state == .completed(purchase))
         #expect(store.load() == nil)
     }
 

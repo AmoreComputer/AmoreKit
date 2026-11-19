@@ -4,7 +4,7 @@ import Foundation
 /// The outcome of an embedded checkout flow.
 public enum CheckoutResult: Sendable, Hashable {
     /// The purchase completed and the license was activated on this device.
-    case completed(License, licenseKey: String)
+    case completed(CheckoutPurchase)
     /// The user dismissed checkout without completing a purchase.
     case cancelled
     /// The flow failed. `CheckoutError.activationFailed` carries the license

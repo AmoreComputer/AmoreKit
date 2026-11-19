@@ -40,6 +40,8 @@ final class MockCheckoutSessionClient: CheckoutSessionClient, @unchecked Sendabl
 final class MockLicenseActivating: LicenseActivating {
     var status: ValidationStatus = .unknown
     var activationError: AmoreError?
+    /// The license a successful activation leaves in `status`.
+    var activatedLicense = License.fixture
     /// When set, `activate(licenseKey:)` suspends here before doing anything
     /// else, so a test can interleave other coordinator calls mid-activation.
     var activateGate: Gate?
@@ -51,7 +53,7 @@ final class MockLicenseActivating: LicenseActivating {
         }
         activatedKeys.append(licenseKey)
         if let activationError { throw activationError }
-        status = .valid(.fixture)
+        status = .valid(activatedLicense)
     }
 }
 
@@ -135,6 +137,16 @@ extension License {
         expiresAt: nil,
         entitlements: [],
         subscriptionState: nil,
+        customer: nil
+    )
+
+    /// A license in its trial period.
+    static let trialFixture = License(
+        id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+        product: Product(name: "Pro", identifier: "pro"),
+        expiresAt: nil,
+        entitlements: [],
+        subscriptionState: .trialing(trialEndsAt: Date(timeIntervalSinceNow: 14 * 86400), canceledAt: nil),
         customer: nil
     )
 }

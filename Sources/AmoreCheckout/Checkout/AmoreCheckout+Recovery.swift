@@ -36,8 +36,8 @@ extension AmoreCheckout {
         // creates anything new, so recovery waits for its result instead of
         // reading that session too.
         if let flow, isInProgress {
-            guard case .completed(let license, _) = await flow.value else { return nil }
-            return license
+            guard case .completed(let purchase) = await flow.value else { return nil }
+            return purchase.license
         }
         let recovery = Task { await resolvePendingPurchase() }
         self.recovery = recovery
